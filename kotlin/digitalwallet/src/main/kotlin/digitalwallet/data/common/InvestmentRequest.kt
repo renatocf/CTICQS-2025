@@ -1,10 +1,9 @@
 package digitalwallet.data.common
 
-import digitalwallet.data.enums.SubwalletType
 import java.math.BigDecimal
 
-data class CreateWithdraw(
+data class InvestmentRequest(
     val walletId: String,
-    val subwalletType: SubwalletType,
     val amount: BigDecimal,
+    val idempotencyKey: String,
 )

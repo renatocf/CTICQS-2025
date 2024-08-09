@@ -1,11 +1,19 @@
 package digitalwallet.data.models
 
 import digitalwallet.data.enums.WalletOwnership
-import digitalwallet.data.enums.WalletType
+import digitalwallet.services.LedgerService
+import jakarta.inject.Inject
+import java.math.BigDecimal
+import java.time.LocalDateTime
 
-data class Wallet(
+abstract class Wallet(
     val id: String,
     val ownership: WalletOwnership,
-    val type: WalletType,
     val policyId: String,
-)
+    val insertedAt: LocalDateTime,
+
+    @Inject
+    val ledgerService: LedgerService
+) {
+    abstract fun getAvailableBalance() : BigDecimal
+}

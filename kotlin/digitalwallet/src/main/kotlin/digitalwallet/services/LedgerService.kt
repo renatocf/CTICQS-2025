@@ -2,161 +2,120 @@ package digitalwallet.services
 
 import digitalwallet.data.common.*
 import digitalwallet.data.common.exceptions.DepositNotAllowed
-import digitalwallet.data.common.exceptions.HoldNotAllowed
 import digitalwallet.data.common.exceptions.InsufficientFunds
 import digitalwallet.data.common.exceptions.TransferNotAllowed
 import digitalwallet.data.enums.BalanceType
 import digitalwallet.data.enums.SubwalletType
+import digitalwallet.data.enums.TransactionStatus
+import digitalwallet.data.enums.TransactionType
+import digitalwallet.data.models.Transaction
+import jakarta.inject.Singleton
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
+@Singleton
 class LedgerService(
-    ledgerRepo: LedgerRepo,
-    subwalletRepo: SubwalletRepo,
+    val ledgerRepo: LedgerRepo,
 ) {
-    fun postJournalEntries(journalEntries: Array<CreateJournalEntry>) {
+//    fun createJournalEntries(transaction: Transaction) {
+//        var journalEntries = emptyList<CreateJournalEntry>()
+//        when (transaction.type) {
+//            TransactionType.DEPOSIT -> journalEntries = deposit(transaction)
+//            TransactionType.WITHDRAW-> journalEntries = withdraw(transaction)
+//            TransactionType.TRANSFER -> journalEntries = transfer(transaction)
+//            TransactionType.HOLD -> journalEntries = hold(transaction)
+//        }
+//
+//        val postedAt = LocalDateTime.now()
+//        for (journalEntry in journalEntries) {
+//            ledgerRepo.insertJournalEntry(journalEntry, postedAt = postedAt)
+//        }
+//
+//        transaction.updateStatus(TransactionStatus.COMPLETED, completedAt = postedAt)
+//    }
+
+    fun postJournalEntries(journalEntries: List<CreateJournalEntry>) : LocalDateTime {
+        val postedAt = LocalDateTime.now()
+
         for (journalEntry in journalEntries) {
-            ledgerRepo.insertJournalEntry(journalEntry)
+            ledgerRepo.insertJournalEntry(journalEntry, postedAt = postedAt)
         }
+
+        return postedAt
     }
 
-    fun getBalance(walletId: String, balanceConfig: Array<BalanceConfig>) : BigDecimal {
+    fun getBalance(walletId: String, balanceConfig: List<BalanceConfig>) : BigDecimal {
         return ledgerRepo.getBalance(walletId, balanceConfig)
     }
 
-    fun deposit(createDeposit: CreateDeposit) {
-        val (walletId, subwalletType, amount) = createDeposit
-
-        if (subwalletType != SubwalletType.REAL_MONEY) {
-            throw DepositNotAllowed("Deposit not allowed for $walletId on $subwalletType type")
-        }
-
-        postJournalEntries(
-            arrayOf(
-                CreateJournalEntry(
-                    walletId = walletId,
-                    subwalletType = subwalletType,
-                    balanceType = BalanceType.AVAILABLE,
-                    amount = amount,
-                ),
-                CreateJournalEntry(
-                    walletId = null,
-                    subwalletType = subwalletType,
-                    balanceType = BalanceType.INTERNAL,
-                    amount = -amount,
-                ),
-            )
-        )
-    }
-
-    fun withdraw(createWithdraw: CreateWithdraw) {
-        val (walletId, subwalletType, amount) = createWithdraw
-
-        if (subwalletType != SubwalletType.REAL_MONEY) {
-            throw DepositNotAllowed("Withdraw not allowed for $walletId on $subwalletType type")
-        }
-
-        val balance = getBalance(walletId, BalanceConfig.availableRealMoney())
-
-        if (amount > balance) {
-            throw InsufficientFunds("Failed to withdraw $walletId on $subwalletType type due to insufficient funds")
-        }
-
-        postJournalEntries(
-            arrayOf(
-                CreateJournalEntry(
-                    walletId = walletId,
-                    subwalletType = subwalletType,
-                    balanceType = BalanceType.AVAILABLE,
-                    amount = -amount,
-                ),
-                CreateJournalEntry(
-                    walletId = null,
-                    subwalletType = subwalletType,
-                    balanceType = BalanceType.INTERNAL,
-                    amount = amount,
-                ),
-            )
-        )
-    }
-
-    fun hold(createHold: CreateHold) {
-        val (walletId, subwalletType, amount) = createHold
-
-        val balanceConfig: Array<BalanceConfig>
-
-        if (createHold.subwalletType == SubwalletType.REAL_MONEY) {
-            balanceConfig = BalanceConfig.availableRealMoney()
-        } else if (createHold.subwalletType == SubwalletType.INVESTMENT) {
-            balanceConfig = BalanceConfig.availableInvestment()
-        } else {
-            throw HoldNotAllowed("Hold not allowed for ${createHold.walletId} on ${createHold.subwalletType} type")
-        }
-
-        val balance = getBalance(walletId, balanceConfig)
-
-        if (amount > balance) {
-            throw InsufficientFunds("Failed to hold $walletId on $subwalletType type due to insufficient funds")
-        }
-
-        postJournalEntries(
-            arrayOf(
-                CreateJournalEntry(
-                    walletId = walletId,
-                    subwalletType = subwalletType,
-                    balanceType = BalanceType.AVAILABLE,
-                    amount = -amount,
-                ),
-                CreateJournalEntry(
-                    walletId = walletId,
-                    subwalletType = subwalletType,
-                    balanceType = BalanceType.HOLDING,
-                    amount = amount,
-                ),
-            )
-        )
-    }
-
-    fun transfer(createTransfer: CreateTransfer) {
-        val (sourceWalletId, sourceSubwalletType, targetWalletId, targetSubwalletType, amount) = createTransfer
-
-        if (!validateTransfer(sourceSubwalletType, targetSubwalletType)) {
-            throw TransferNotAllowed("Transfer from $sourceSubwalletType on $sourceSubwalletType to $targetSubwalletType not allowed")
-        }
-
-        var balanceConfig: Array<BalanceConfig> = emptyArray()
-
-        if (sourceSubwalletType == SubwalletType.REAL_MONEY) {
-            balanceConfig = BalanceConfig.availableRealMoney()
-        } else if (sourceSubwalletType == SubwalletType.INVESTMENT) {
-            balanceConfig = BalanceConfig.availableInvestment()
-        }
-
-        val balance = getBalance(sourceWalletId, balanceConfig)
-
-        if (amount > balance) {
-            throw InsufficientFunds("Failed to transfer from $sourceSubwalletType on $sourceSubwalletType to $targetSubwalletType due to insufficient funds")
-        }
-
-        postJournalEntries(
-            arrayOf(
-                CreateJournalEntry(
-                    walletId = sourceWalletId,
-                    subwalletType = sourceSubwalletType,
-                    balanceType = BalanceType.AVAILABLE,
-                    amount = -amount,
-                ),
-                CreateJournalEntry(
-                    walletId = targetWalletId,
-                    subwalletType = targetSubwalletType,
-                    balanceType = BalanceType.AVAILABLE,
-                    amount = amount,
-                ),
-            )
-        )
-    }
-
-    private fun validateTransfer(sourceSubwalletType: SubwalletType, targetSubwalletType: SubwalletType) : Boolean {
-        return sourceSubwalletType == SubwalletType.REAL_MONEY && targetSubwalletType == SubwalletType.EMERGENCY_FUND ||
-                sourceSubwalletType == SubwalletType.EMERGENCY_FUND && targetSubwalletType == SubwalletType.REAL_MONEY
-    }
+//    private fun deposit(transaction: Transaction) : List<CreateJournalEntry> {
+//        return listOf(
+//            CreateJournalEntry(
+//                walletId = transaction.originatorWalletId,
+//                subwalletType = transaction.originatorSubwalletType,
+//                balanceType = BalanceType.AVAILABLE,
+//                amount = transaction.amount,
+//            ),
+//            CreateJournalEntry(
+//                walletId = null,
+//                subwalletType = transaction.originatorSubwalletType,
+//                balanceType = BalanceType.INTERNAL,
+//                amount = -transaction.amount,
+//            ),
+//        )
+//    }
+//
+//    private fun withdraw(transaction: Transaction) : List<CreateJournalEntry> {
+//        return listOf(
+//            CreateJournalEntry(
+//                walletId = transaction.originatorWalletId,
+//                subwalletType = transaction.originatorSubwalletType,
+//                balanceType = BalanceType.AVAILABLE,
+//                amount = -transaction.amount,
+//            ),
+//            CreateJournalEntry(
+//                walletId = null,
+//                subwalletType = transaction.originatorSubwalletType,
+//                balanceType = BalanceType.INTERNAL,
+//                amount = transaction.amount,
+//            ),
+//        )
+//
+//    }
+//
+//    private fun hold(transaction: Transaction) : List<CreateJournalEntry> {
+//        return listOf(
+//            CreateJournalEntry(
+//                walletId = transaction.originatorWalletId,
+//                subwalletType = transaction.originatorSubwalletType,
+//                balanceType = BalanceType.AVAILABLE,
+//                amount = -transaction.amount,
+//            ),
+//            CreateJournalEntry(
+//                walletId = transaction.originatorWalletId,
+//                subwalletType = transaction.originatorSubwalletType,
+//                balanceType = BalanceType.HOLDING,
+//                amount = transaction.amount,
+//            ),
+//        )
+//    }
+//
+//    private fun transfer(transaction: Transaction) : List<CreateJournalEntry> {
+//        val beneficiarySubwalletType = transaction.beneficiarySubwalletType ?: throw IllegalArgumentException("Invalid beneficiary subwallet type")
+//
+//        return listOf(
+//            CreateJournalEntry(
+//                walletId = transaction.originatorWalletId,
+//                subwalletType = transaction.originatorSubwalletType,
+//                balanceType = BalanceType.AVAILABLE,
+//                amount = -transaction.amount,
+//            ),
+//            CreateJournalEntry(
+//                walletId = transaction.beneficiaryWalletId,
+//                subwalletType = beneficiarySubwalletType,
+//                balanceType = BalanceType.AVAILABLE,
+//                amount = transaction.amount,
+//            ),
+//        )
+//    }
 }

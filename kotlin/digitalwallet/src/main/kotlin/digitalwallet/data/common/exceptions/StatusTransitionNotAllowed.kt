@@ -3,4 +3,6 @@ package digitalwallet.data.common.exceptions
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.exceptions.HttpStatusException
 
-class HoldNotAllowed(message: String) : HttpStatusException(HttpStatus.PRECONDITION_FAILED, message)
+open class DbError(message: String) : Exception(message)
+
+class StatusTransitionNotAllowed(message: String) : DbError(message)
