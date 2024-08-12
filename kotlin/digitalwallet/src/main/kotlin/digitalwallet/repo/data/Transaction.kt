@@ -14,6 +14,7 @@ import java.time.LocalDateTime
 
 data class Transaction(
     val id: String,
+    val batchId: String ? = null,
     val amount: BigDecimal,
     val idempotencyKey: String,
     val originatorWalletId: String,
@@ -32,6 +33,7 @@ data class Transaction(
         return when(this.type) {
             TransactionType.DEPOSIT -> Deposit(
                 id = this.id,
+                batchId = this.batchId,
                 amount = this.amount,
                 idempotencyKey = this.idempotencyKey,
                 originatorWalletId = this.originatorWalletId,
@@ -44,6 +46,7 @@ data class Transaction(
             )
             TransactionType.WITHDRAW -> Withdraw(
                 id = this.id,
+                batchId = this.batchId,
                 amount = this.amount,
                 idempotencyKey = this.idempotencyKey,
                 originatorWalletId = this.originatorWalletId,
@@ -56,6 +59,7 @@ data class Transaction(
             )
             TransactionType.HOLD -> Hold(
                 id = this.id,
+                batchId = this.batchId,
                 amount = this.amount,
                 idempotencyKey = this.idempotencyKey,
                 originatorWalletId = this.originatorWalletId,
@@ -68,6 +72,7 @@ data class Transaction(
             )
             TransactionType.TRANSFER -> Transfer(
                 id = this.id,
+                batchId = this.batchId,
                 amount = this.amount,
                 idempotencyKey = this.idempotencyKey,
                 originatorWalletId = this.originatorWalletId,

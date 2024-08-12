@@ -13,10 +13,8 @@ class InvestmentWallet(
     ownership: WalletOwnership,
     policyId: String,
     insertedAt: LocalDateTime,
-
-    private val ledgerService: LedgerService,
     ) : Wallet(id, ownership, policyId, insertedAt) {
-    override fun getAvailableBalance(): BigDecimal {
+    override fun getAvailableBalance(ledgerService: LedgerService): BigDecimal {
         val balanceConfig =  listOf(
             BalanceConfig(
                 subwalletType = SubwalletType.BONDS,

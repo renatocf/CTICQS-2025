@@ -1,58 +1,52 @@
 package digitalwallet.data.models
 
-import digitalwallet.data.common.BalanceConfig
 import digitalwallet.data.common.CreateJournalEntry
 import digitalwallet.data.common.TransactionMetadata
 import digitalwallet.data.enums.BalanceType
 import digitalwallet.data.enums.SubwalletType
 import digitalwallet.data.enums.TransactionStatus
-import digitalwallet.data.enums.WalletType
 import digitalwallet.repo.TransactionsRepo
 import digitalwallet.repo.WalletsRepo
-import digitalwallet.services.ExternalTransactionValidationException
-import digitalwallet.services.InsufficientFundsException
 import digitalwallet.services.LedgerService
-import digitalwallet.services.ValidationService
+import digitalwallet.services.PartnerService
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 class Withdraw(
     id: String,
+    batchId: String? = null,
     amount: BigDecimal,
     idempotencyKey: String,
     originatorWalletId: String,
     originatorSubwalletType: SubwalletType,
     insertedAt: LocalDateTime,
+    reversedAt: LocalDateTime? = null,
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: TransactionStatus,
     statusReason: String? = null,
     metadata: TransactionMetadata?,
-
-    transactionsRepo: TransactionsRepo,
-
-    private val validationService: ValidationService,
-    private val ledgerService: LedgerService,
-) : Transaction(
+  ) : Transaction(
     id,
+    batchId,
     amount,
     idempotencyKey,
     originatorWalletId,
     originatorSubwalletType,
     insertedAt,
+    reversedAt,
     completedAt,
     failedAt,
     status,
     statusReason,
     metadata,
-    transactionsRepo,
 ) {
-    override fun validate() {
-        validationService.validateExternalTransaction(this)
-        validationService.validateBalance(this)
+    override fun validate(walletsRepo: WalletsRepo, ledgerService: LedgerService) {
+        validateExternalTransaction()
+        validateBalance(walletsRepo, ledgerService)
     }
 
-    override fun postToLedger() : LocalDateTime {
+    override suspend fun process(transactionsRepo: TransactionsRepo, ledgerService: LedgerService, partnerService: PartnerService) {
         val journalEntries = listOf(
             CreateJournalEntry(
                 walletId = this.originatorWalletId,
@@ -68,10 +62,12 @@ class Withdraw(
             ),
         )
 
-       return ledgerService.postJournalEntries(journalEntries)
+        val postedAt = ledgerService.postJournalEntries(journalEntries)
+
+        this.updateStatus(transactionsRepo, newStatus = TransactionStatus.COMPLETED, at = postedAt)
     }
 
-    override fun reversePostToLedger() {
+    override fun reverseJournalEntries(ledgerService: LedgerService) : LocalDateTime {
         val journalEntries = listOf(
             CreateJournalEntry(
                 walletId = this.originatorWalletId,
@@ -87,6 +83,6 @@ class Withdraw(
             ),
         )
 
-        ledgerService.postJournalEntries(journalEntries)
+        return ledgerService.postJournalEntries(journalEntries)
     }
 }

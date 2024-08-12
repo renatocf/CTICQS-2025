@@ -4,5 +4,6 @@ enum class TransactionType {
     DEPOSIT,
     WITHDRAW,
     TRANSFER,
-    HOLD
+    HOLD,
+    TRANSFER_FROM_HOLD,
 }

@@ -6,47 +6,46 @@ import digitalwallet.data.enums.BalanceType
 import digitalwallet.data.enums.SubwalletType
 import digitalwallet.data.enums.TransactionStatus
 import digitalwallet.repo.TransactionsRepo
+import digitalwallet.repo.WalletsRepo
 import digitalwallet.services.LedgerService
-import digitalwallet.services.ValidationService
+import digitalwallet.services.PartnerService
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 class Deposit(
     id: String,
+    batchId: String? = null,
     amount: BigDecimal,
     idempotencyKey: String,
     originatorWalletId: String,
     originatorSubwalletType: SubwalletType,
     insertedAt: LocalDateTime,
+    reversedAt: LocalDateTime? = null,
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: TransactionStatus,
     statusReason: String? = null,
     metadata: TransactionMetadata?,
-
-    transactionsRepo: TransactionsRepo,
-
-    private val validationService: ValidationService,
-    private val ledgerService: LedgerService,
-) : Transaction(
+ ) : Transaction(
     id,
+    batchId,
     amount,
     idempotencyKey,
     originatorWalletId,
     originatorSubwalletType,
     insertedAt,
+    reversedAt,
     completedAt,
     failedAt,
     status,
     statusReason,
     metadata,
-    transactionsRepo,
 ) {
-    override fun validate() {
-        validationService.validateExternalTransaction(this)
+    override fun validate(walletsRepo: WalletsRepo, ledgerService: LedgerService) {
+        validateExternalTransaction()
     }
 
-    override fun postToLedger() : LocalDateTime {
+    override suspend fun process(transactionsRepo: TransactionsRepo, ledgerService: LedgerService, partnerService: PartnerService) {
         val journalEntries = listOf(
             CreateJournalEntry(
                 walletId = this.originatorWalletId,
@@ -59,28 +58,30 @@ class Deposit(
                 subwalletType = this.originatorSubwalletType,
                 balanceType = BalanceType.INTERNAL,
                 amount = -this.amount,
+            ),
+        )
+
+        val postedAt = ledgerService.postJournalEntries(journalEntries)
+
+        this.updateStatus(transactionsRepo, newStatus = TransactionStatus.COMPLETED, at = postedAt)
+    }
+
+    override fun reverseJournalEntries(ledgerService: LedgerService) : LocalDateTime {
+        val journalEntries = listOf(
+            CreateJournalEntry(
+                walletId = this.originatorWalletId,
+                subwalletType = this.originatorSubwalletType,
+                balanceType = BalanceType.AVAILABLE,
+                amount = -this.amount,
+            ),
+            CreateJournalEntry(
+                walletId = null,
+                subwalletType = this.originatorSubwalletType,
+                balanceType = BalanceType.INTERNAL,
+                amount = this.amount,
             ),
         )
 
         return ledgerService.postJournalEntries(journalEntries)
-    }
-
-    override fun reversePostToLedger() {
-        val journalEntries = listOf(
-            CreateJournalEntry(
-                walletId = this.originatorWalletId,
-                subwalletType = this.originatorSubwalletType,
-                balanceType = BalanceType.AVAILABLE,
-                amount = -this.amount,
-            ),
-            CreateJournalEntry(
-                walletId = null,
-                subwalletType = this.originatorSubwalletType,
-                balanceType = BalanceType.INTERNAL,
-                amount = this.amount,
-            ),
-        )
-
-        ledgerService.postJournalEntries(journalEntries)
     }
 }

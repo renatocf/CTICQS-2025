@@ -14,10 +14,8 @@ class EmergencyFundsWallet(
     ownership: WalletOwnership,
     policyId: String,
     insertedAt: LocalDateTime,
-
-    private val ledgerService: LedgerService,
-) : Wallet(id, ownership, policyId, insertedAt) {
-    override fun getAvailableBalance(): BigDecimal {
+    ) : Wallet(id, ownership, policyId, insertedAt) {
+    override fun getAvailableBalance(ledgerService: LedgerService): BigDecimal {
         val balanceConfig =  listOf(BalanceConfig(
             subwalletType = SubwalletType.EMERGENCY_FUND,
             balanceType = BalanceType.AVAILABLE,

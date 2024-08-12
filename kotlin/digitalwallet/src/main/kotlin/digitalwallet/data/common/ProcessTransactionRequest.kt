@@ -6,6 +6,7 @@ import java.math.BigDecimal
 
 data class ProcessTransactionRequest(
     val amount: BigDecimal,
+    val batchId: String? = null,
     val idempotencyKey: String,
     val originatorWalletId: String,
     val originatorSubwalletType: SubwalletType,

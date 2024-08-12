@@ -8,47 +8,44 @@ import digitalwallet.data.enums.SubwalletType
 import digitalwallet.data.enums.TransactionStatus
 import digitalwallet.repo.TransactionsRepo
 import digitalwallet.repo.WalletsRepo
-import digitalwallet.services.InsufficientFundsException
 import digitalwallet.services.LedgerService
-import digitalwallet.services.ValidationService
+import digitalwallet.services.PartnerService
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 class Transfer(
     id: String,
+    batchId: String? = null,
     amount: BigDecimal,
     idempotencyKey: String,
     originatorWalletId: String,
     originatorSubwalletType: SubwalletType,
     insertedAt: LocalDateTime,
+    reversedAt: LocalDateTime? = null,
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: TransactionStatus,
     statusReason: String? = null,
     metadata: TransactionMetadata?,
 
-    transactionsRepo: TransactionsRepo,
-
     val beneficiaryWalletId: String,
     val beneficiarySubwalletType: SubwalletType,
-
-    private val validationService: ValidationService,
-    private val ledgerService: LedgerService,
     ) : Transaction(
     id,
+    batchId,
     amount,
     idempotencyKey,
     originatorWalletId,
     originatorSubwalletType,
     insertedAt,
+    reversedAt,
     completedAt,
     failedAt,
     status,
     statusReason,
     metadata,
-    transactionsRepo
 ) {
-    override fun validate() {
+    override fun validate(walletsRepo: WalletsRepo, ledgerService: LedgerService) {
         val originatorSubwalletType = this.originatorSubwalletType
         val beneficiarySubwalletType = this.beneficiarySubwalletType
 
@@ -61,10 +58,12 @@ class Transfer(
             throw TransferNotAllowed("Transfer not allowed between $originatorSubwalletType and $beneficiarySubwalletType types")
         }
 
-        validationService.validateBalance(this)
+        validateBalance(walletsRepo, ledgerService)
     }
 
-    override fun postToLedger() : LocalDateTime {
+    override suspend fun process(transactionsRepo: TransactionsRepo, ledgerService: LedgerService, partnerService: PartnerService) {
+        partnerService.executeInternalTransfer(this)
+
         val journalEntries = listOf(
             CreateJournalEntry(
                 walletId = this.originatorWalletId,
@@ -77,28 +76,30 @@ class Transfer(
                 subwalletType = this.beneficiarySubwalletType,
                 balanceType = BalanceType.AVAILABLE,
                 amount = this.amount,
+            ),
+        )
+
+        val postedAt = ledgerService.postJournalEntries(journalEntries)
+
+        this.updateStatus(transactionsRepo, newStatus = TransactionStatus.COMPLETED, at = postedAt)
+    }
+
+    override fun reverseJournalEntries(ledgerService: LedgerService) : LocalDateTime {
+        val journalEntries = listOf(
+            CreateJournalEntry(
+                walletId = this.originatorWalletId,
+                subwalletType = this.originatorSubwalletType,
+                balanceType = BalanceType.AVAILABLE,
+                amount = this.amount,
+            ),
+            CreateJournalEntry(
+                walletId = this.beneficiaryWalletId,
+                subwalletType = this.beneficiarySubwalletType,
+                balanceType = BalanceType.AVAILABLE,
+                amount = -this.amount,
             ),
         )
 
         return ledgerService.postJournalEntries(journalEntries)
-    }
-
-    override fun reversePostToLedger() {
-        val journalEntries = listOf(
-            CreateJournalEntry(
-                walletId = this.originatorWalletId,
-                subwalletType = this.originatorSubwalletType,
-                balanceType = BalanceType.AVAILABLE,
-                amount = this.amount,
-            ),
-            CreateJournalEntry(
-                walletId = this.beneficiaryWalletId,
-                subwalletType = this.beneficiarySubwalletType,
-                balanceType = BalanceType.AVAILABLE,
-                amount = -this.amount,
-            ),
-        )
-
-        ledgerService.postJournalEntries(journalEntries)
     }
 }

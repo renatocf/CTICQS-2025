@@ -11,9 +11,6 @@ abstract class Wallet(
     val ownership: WalletOwnership,
     val policyId: String,
     val insertedAt: LocalDateTime,
-
-    @Inject
-    val ledgerService: LedgerService
 ) {
-    abstract fun getAvailableBalance() : BigDecimal
+    abstract fun getAvailableBalance(ledgerService: LedgerService) : BigDecimal
 }

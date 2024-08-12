@@ -2,10 +2,19 @@ package digitalwallet.repo
 
 import digitalwallet.data.common.ProcessTransactionRequest
 import digitalwallet.data.common.exceptions.StatusTransitionNotAllowed
+import digitalwallet.data.enums.SubwalletType
 import digitalwallet.data.enums.TransactionStatus
 import digitalwallet.repo.data.Transaction
+import digitalwallet.data.models.Transaction as TransactionModel
 import java.time.LocalDateTime
 import java.util.UUID
+
+data class TransactionFilter(
+    val id: String? = null,
+    val batchId: String? = null,
+    val status: TransactionStatus? = null,
+    val subwalletType: List<SubwalletType>? = null,
+)
 
 class TransactionsRepo {
     private val transactions = mutableMapOf<String, Transaction>()
@@ -31,21 +40,33 @@ class TransactionsRepo {
         return transaction
     }
 
+    fun find(filter: TransactionFilter) : List<TransactionModel> {
+        return transactions.values.filter { transaction ->
+            (filter.id?.let { it == transaction.id } ?: true) &&
+                    (filter.batchId?.let { it == transaction.batchId } ?: true) &&
+                    (filter.status?.let { it == transaction.status } ?: true) &&
+                    (filter.subwalletType?.let { transaction.originatorSubwalletType in it} ?: true)
+        }.map { it.dto() }
+    }
+
     private fun validateTransition(status: TransactionStatus, newStatus: TransactionStatus) {
         val allowedStatus : List<TransactionStatus>
 
         when (status) {
             TransactionStatus.CREATING -> {
-                allowedStatus = listOf(TransactionStatus.CREATING, TransactionStatus.PROCESSING)
+                allowedStatus = listOf(TransactionStatus.CREATING, TransactionStatus.PROCESSING, TransactionStatus.TRANSIENT_ERROR)
             }
             TransactionStatus.PROCESSING -> {
-                allowedStatus = listOf(TransactionStatus.PROCESSING, TransactionStatus.COMPLETED, TransactionStatus.FAILED)
+                allowedStatus = listOf(TransactionStatus.PROCESSING, TransactionStatus.COMPLETED, TransactionStatus.FAILED, TransactionStatus.TRANSIENT_ERROR)
             }
             TransactionStatus.COMPLETED -> {
                 allowedStatus = listOf(TransactionStatus.COMPLETED)
             }
             TransactionStatus.FAILED -> {
                 allowedStatus = listOf(TransactionStatus.FAILED)
+            }
+            TransactionStatus.TRANSIENT_ERROR -> {
+                allowedStatus = listOf(TransactionStatus.TRANSIENT_ERROR)
             }
         }
 
@@ -54,7 +75,7 @@ class TransactionsRepo {
         }
     }
 
-    fun update(transactionId: String, status: TransactionStatus, statusReason : String? = null, at : LocalDateTime? = null) {
+    fun update(transactionId: String, status: TransactionStatus, statusReason : String? = null, at : LocalDateTime? = LocalDateTime.now()) {
         val transaction = transactions[transactionId]!!
 
         validateTransition(status = transaction.status, newStatus = status)
