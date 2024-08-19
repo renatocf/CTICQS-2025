@@ -8,7 +8,7 @@ data class InvestmentPolicy(
     val id: String,
     val allocationStrategy: MutableMap<SubwalletType, BigDecimal>
 ) {
-    fun dto(): InvestmentPolicyDto {
+    fun toModel(): InvestmentPolicyDto {
         return InvestmentPolicyDto(
             id = this.id,
             allocationStrategy = this.allocationStrategy

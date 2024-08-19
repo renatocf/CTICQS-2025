@@ -9,13 +9,14 @@ import digitalwallet.data.enums.SubwalletType
 import digitalwallet.data.enums.TransactionStatus
 import digitalwallet.data.enums.TransactionType
 import digitalwallet.data.models.Transaction
+import digitalwallet.repo.LedgerRepo
 import jakarta.inject.Singleton
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Singleton
 class LedgerService(
-    val ledgerRepo: LedgerRepo,
+    private val ledgerRepo: LedgerRepo,
 ) {
 //    fun createJournalEntries(transaction: Transaction) {
 //        var journalEntries = emptyList<CreateJournalEntry>()

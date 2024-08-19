@@ -1,16 +1,16 @@
 package digitalwallet.data.models
 
-import digitalwallet.data.enums.WalletOwnership
 import digitalwallet.services.LedgerService
-import jakarta.inject.Inject
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 abstract class Wallet(
     val id: String,
-    val ownership: WalletOwnership,
+    val customerId: String,
     val policyId: String,
     val insertedAt: LocalDateTime,
 ) {
     abstract fun getAvailableBalance(ledgerService: LedgerService) : BigDecimal
+    abs
+
 }

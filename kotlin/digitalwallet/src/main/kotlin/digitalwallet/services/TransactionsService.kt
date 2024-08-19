@@ -20,7 +20,7 @@ class TransactionsService(
     private val logger = Logger()
 
     suspend fun processTransaction(processTransactionRequest: ProcessTransactionRequest) : Transaction {
-        val transaction = transactionsRepo.insert(processTransactionRequest).dto()
+        val transaction = transactionsRepo.insert(processTransactionRequest)
 
         try {
             transaction.validate(walletsRepo, ledgerService)

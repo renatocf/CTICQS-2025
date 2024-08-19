@@ -10,10 +10,10 @@ import java.time.LocalDateTime
 
 class InvestmentWallet(
     id: String,
-    ownership: WalletOwnership,
+    customerId: String,
     policyId: String,
     insertedAt: LocalDateTime,
-    ) : Wallet(id, ownership, policyId, insertedAt) {
+    ) : Wallet(id, customerId, policyId, insertedAt) {
     override fun getAvailableBalance(ledgerService: LedgerService): BigDecimal {
         val balanceConfig =  listOf(
             BalanceConfig(

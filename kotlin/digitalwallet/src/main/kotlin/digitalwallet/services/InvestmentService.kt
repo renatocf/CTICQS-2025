@@ -13,7 +13,7 @@ import digitalwallet.repo.TransactionsRepo
 import digitalwallet.repo.WalletsRepo
 import java.math.BigDecimal
 
-data class ProcessBatchWithInvestmentPolicy(
+data class InvestmentMovementRequest(
     val amount: BigDecimal,
     val idempotencyKey: String,
     val walletId: String,
@@ -29,7 +29,7 @@ class InvestmentService(
 ) {
     private val logger = Logger()
 
-    suspend fun processHoldBatchWithInvestmentPolicy(request: ProcessBatchWithInvestmentPolicy) {
+    suspend fun holdWithPolicy(request: InvestmentMovementRequest) {
         for ((subwalletType, percentage) in request.investmentPolicy.allocationStrategy) {
             val processTransactionRequest = ProcessTransactionRequest(
                 amount = request.amount * percentage,
@@ -43,13 +43,14 @@ class InvestmentService(
             val transaction = transactionsService.processTransaction(processTransactionRequest)
 
             if (transaction.status != TransactionStatus.PROCESSING) {
+                logger.error("Investment movement failed for request ${request.idempotencyKey}")
                 transactionsService.reverseAndFailTransactionsBatch(request.idempotencyKey)
                 throw TransactionFailed("Transaction ${transaction.id} failed")
             }
         }
     }
 
-    suspend fun processTransferFromHoldBatchWithInvestmentPolicy(request: ProcessBatchWithInvestmentPolicy) {
+    private suspend fun transferWithPolicy(request: InvestmentMovementRequest) {
         for ((subwalletType, percentage) in request.investmentPolicy.allocationStrategy) {
             val processTransactionRequest = ProcessTransactionRequest(
                 amount = request.amount * percentage,
@@ -63,6 +64,7 @@ class InvestmentService(
             val transaction = transactionsService.processTransaction(processTransactionRequest)
 
             if (transaction.status != TransactionStatus.COMPLETED) {
+                logger.error("Investment movement failed for request ${request.idempotencyKey}")
                 transactionsService.reverseAndFailTransactionsBatch(request.idempotencyKey)
                 throw TransactionFailed("Transaction ${transaction.id} failed")
             }
@@ -78,14 +80,14 @@ class InvestmentService(
         )
 
         for (investmentTransaction in transactions) {
-            val wallet = walletRepo.findById(investmentTransaction.originatorWalletId)?.dto()
+            val wallet = walletRepo.findById(investmentTransaction.originatorWalletId)
                 ?: throw NoSuchElementException("Wallet ${investmentTransaction.originatorWalletId} not found")
-            val investmentPolicy = investmentPolicyRepo.findById(wallet.policyId)?.dto()
+            val investmentPolicy = investmentPolicyRepo.findById(wallet.policyId)
                 ?: throw NoSuchElementException("Policy ${wallet.policyId} not found")
 
             try {
-                processTransferFromHoldBatchWithInvestmentPolicy(
-                    ProcessBatchWithInvestmentPolicy(
+                transferWithPolicy(
+                    InvestmentMovementRequest(
                         amount = investmentTransaction.amount,
                         idempotencyKey = investmentTransaction.id,
                         walletId = investmentTransaction.originatorWalletId,

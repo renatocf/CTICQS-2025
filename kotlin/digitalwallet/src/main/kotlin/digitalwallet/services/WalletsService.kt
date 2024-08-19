@@ -8,8 +8,13 @@ import digitalwallet.data.common.exceptions.TransactionFailed
 import digitalwallet.data.enums.SubwalletType
 import digitalwallet.data.enums.TransactionStatus
 import digitalwallet.data.enums.TransactionType
+import digitalwallet.data.enums.WalletType
 import digitalwallet.repo.InvestmentPolicyRepo
+import digitalwallet.repo.WalletFilter
 import digitalwallet.repo.WalletsRepo
+
+class InvestmentFailed(message: String) : Exception()
+class LiquidationFailed(message: String) : Exception()
 
 class WalletsService(
     private val walletsRepo: WalletsRepo,
@@ -20,44 +25,48 @@ class WalletsService(
     private val logger = Logger()
 
     suspend fun invest(request: InvestmentRequest) {
-        val wallet = walletsRepo.findById(request.walletId)?.dto() ?: throw NoSuchElementException("Wallet ${request.walletId} not found")
-
-        // check if it is real money
+        val wallet = walletsRepo.find(
+            WalletFilter(
+                customerId = request.customerId,
+                type = WalletType.REAL_MONEY
+            )
+        ).firstOrNull() ?: throw NoSuchElementException("Wallet not found for customer ${request.customerId}")
 
         val processTransactionRequest = ProcessTransactionRequest(
             amount = request.amount,
             idempotencyKey = request.idempotencyKey,
-            originatorWalletId = request.walletId,
+            originatorWalletId = wallet.id,
             originatorSubwalletType = SubwalletType.REAL_MONEY,
             type = TransactionType.HOLD,
         )
 
-        transactionsService.processTransaction(processTransactionRequest)
+        val transaction = transactionsService.processTransaction(processTransactionRequest)
 
-        // we should test if transfer is processing...
+        if (transaction.status != TransactionStatus.PROCESSING) {
+            throw InvestmentFailed("Failed to process investment ${request.idempotencyKey}")
+        }
     }
 
     suspend fun liquidate(request: LiquidationRequest) {
-        val wallet = walletsRepo.findById(request.walletId)?.dto() ?: throw NoSuchElementException("Wallet ${request.walletId} not found")
-        val investmentPolicy = investmentPolicyRepo.findById(wallet.policyId)?.dto() ?: throw NoSuchElementException("Policy ${wallet.policyId} not found")
-
-        // should we check if investment policy is consistent?
+        val wallet = walletsRepo.find(
+            WalletFilter(
+                customerId = request.customerId,
+                type = WalletType.INVESTMENT
+            )
+        ) .firstOrNull() ?: throw NoSuchElementException("Wallet not found for customer ${request.customerId}")
+        val investmentPolicy = investmentPolicyRepo.findById(wallet.policyId) ?: throw NoSuchElementException("Policy ${wallet.policyId} not found")
 
         try {
-            investmentService.processHoldBatchWithInvestmentPolicy(
-                ProcessBatchWithInvestmentPolicy(
+        investmentService.holdWithPolicy(
+                InvestmentMovementRequest(
                 amount = request.amount,
                 idempotencyKey = request.idempotencyKey,
-                walletId = request.walletId,
+                walletId = wallet.id,
                 investmentPolicy = investmentPolicy,
-            )
+               )
             )
         } catch (e: TransactionFailed) {
-            val message = e.message.toString()
-            logger.error(message)
-            transactionsService.reverseAndFailTransactionsBatch(request.idempotencyKey)
+            throw LiquidationFailed(e.message.toString())
         }
-            // we should test if transfer is processing...
-            // should we hold atomically? If so, is it actually complicated to do this in Kotlin?
     }
 }

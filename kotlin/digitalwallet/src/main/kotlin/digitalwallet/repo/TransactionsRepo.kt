@@ -19,7 +19,7 @@ data class TransactionFilter(
 class TransactionsRepo {
     private val transactions = mutableMapOf<String, Transaction>()
 
-    fun insert(request: ProcessTransactionRequest) : Transaction {
+    fun insert(request: ProcessTransactionRequest) : TransactionModel {
         val id = UUID.randomUUID().toString()
 
         val transaction = Transaction(
@@ -37,7 +37,7 @@ class TransactionsRepo {
         )
 
         transactions[id] = transaction
-        return transaction
+        return transaction.toModel()
     }
 
     fun find(filter: TransactionFilter) : List<TransactionModel> {
@@ -46,7 +46,7 @@ class TransactionsRepo {
                     (filter.batchId?.let { it == transaction.batchId } ?: true) &&
                     (filter.status?.let { it == transaction.status } ?: true) &&
                     (filter.subwalletType?.let { transaction.originatorSubwalletType in it} ?: true)
-        }.map { it.dto() }
+        }.map { it.toModel() }
     }
 
     private fun validateTransition(status: TransactionStatus, newStatus: TransactionStatus) {

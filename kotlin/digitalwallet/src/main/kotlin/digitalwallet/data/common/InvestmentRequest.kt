@@ -3,7 +3,7 @@ package digitalwallet.data.common
 import java.math.BigDecimal
 
 data class InvestmentRequest(
-    val walletId: String,
+    val customerId: String,
     val amount: BigDecimal,
     val idempotencyKey: String,
 )

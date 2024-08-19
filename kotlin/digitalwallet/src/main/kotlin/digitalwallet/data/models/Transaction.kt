@@ -37,12 +37,12 @@ abstract class Transaction(
 
     fun validateBalance(walletsRepo: WalletsRepo, ledgerService: LedgerService) {
         val walletId = this.originatorWalletId
-        val wallet = walletsRepo.findById(walletId)?.dto() ?: throw NoSuchElementException("Wallet $walletId not found")
+        val wallet = walletsRepo.findById(walletId) ?: throw NoSuchElementException("Wallet $walletId not found")
 
         val balance = wallet.getAvailableBalance(ledgerService)
 
         if (this.amount > balance) {
-            throw InsufficientFundsException("Wallet has no sufficient funds ")
+            throw InsufficientFundsException("Wallet has no sufficient funds")
         }
     }
 

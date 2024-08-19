@@ -11,10 +11,10 @@ import java.time.LocalDateTime
 
 class EmergencyFundsWallet(
     id: String,
-    ownership: WalletOwnership,
+    customerId: String,
     policyId: String,
     insertedAt: LocalDateTime,
-    ) : Wallet(id, ownership, policyId, insertedAt) {
+    ) : Wallet(id, customerId, policyId, insertedAt) {
     override fun getAvailableBalance(ledgerService: LedgerService): BigDecimal {
         val balanceConfig =  listOf(BalanceConfig(
             subwalletType = SubwalletType.EMERGENCY_FUND,

@@ -10,28 +10,28 @@ import java.time.LocalDateTime
 
 data class Wallet(
     val id: String,
+    val customerId: String,
     val type: WalletType,
-    val ownership: WalletOwnership,
     val policyId: String,
     val insertedAt: LocalDateTime
 ) {
-    fun dto() : WalletDto {
+    fun toModel() : WalletDto {
         return when (this.type) {
             WalletType.REAL_MONEY -> RealMoneyWallet(
                 id = this.id,
-                ownership = this.ownership,
-                policyId = this.policyId,
+                customerId = this.customerId,
+                 policyId = this.policyId,
                 insertedAt = this.insertedAt
             )
             WalletType.INVESTMENT -> InvestmentWallet(
                 id = this.id,
-                ownership = this.ownership,
+                customerId = this.customerId,
                 policyId = this.policyId,
                 insertedAt = this.insertedAt
             )
             WalletType.EMERGENCY_FUND -> EmergencyFundsWallet(
                 id = this.id,
-                ownership = this.ownership,
+                customerId = this.customerId,
                 policyId = this.policyId,
                 insertedAt = this.insertedAt
             )
