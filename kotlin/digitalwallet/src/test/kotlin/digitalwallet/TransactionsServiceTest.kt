@@ -487,5 +487,81 @@ class TransactionsServiceTest : DescribeSpec() {
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }
             }
         }
+
+        describe("reverseAndFailTransactionsBatch") {
+            it("works") {
+                val batchId = "batchId"
+                val originatorWalletId = "originatorWalletId"
+
+                val transaction1 =
+                    insertTransactionInMemory(
+                        db = transactionsDatabaseInMemory,
+                        amount = BigDecimal(100),
+                        idempotencyKey = "idempotencyKey1",
+                        originatorWalletId = originatorWalletId,
+                        originatorSubwalletType = SubwalletType.REAL_ESTATE,
+                        batchId = batchId,
+                        type = TransactionType.HOLD,
+                        status = TransactionStatus.PROCESSING,
+                    )
+
+                val transaction2 =
+                    insertTransactionInMemory(
+                        db = transactionsDatabaseInMemory,
+                        amount = BigDecimal(200),
+                        idempotencyKey = "idempotencyKey2",
+                        originatorWalletId = originatorWalletId,
+                        originatorSubwalletType = SubwalletType.STOCK,
+                        batchId = batchId,
+                        type = TransactionType.HOLD,
+                        status = TransactionStatus.PROCESSING,
+                    )
+
+                transactionsService.reverseAndFailTransactionsBatch(batchId = batchId)
+
+                transaction1.status shouldBe TransactionStatus.FAILED
+                transaction2.status shouldBe TransactionStatus.FAILED
+
+                coVerify {
+                    ledgerServiceMock.postJournalEntries(
+                        journalEntries =
+                            listOf(
+                                CreateJournalEntry(
+                                    walletId = originatorWalletId,
+                                    subwalletType = SubwalletType.REAL_ESTATE,
+                                    amount = BigDecimal(100),
+                                    balanceType = BalanceType.AVAILABLE,
+                                ),
+                                CreateJournalEntry(
+                                    walletId = originatorWalletId,
+                                    subwalletType = SubwalletType.REAL_ESTATE,
+                                    amount = BigDecimal(-100),
+                                    balanceType = BalanceType.HOLDING,
+                                ),
+                            ),
+                    )
+                }
+
+                coVerify {
+                    ledgerServiceMock.postJournalEntries(
+                        journalEntries =
+                            listOf(
+                                CreateJournalEntry(
+                                    walletId = originatorWalletId,
+                                    subwalletType = SubwalletType.STOCK,
+                                    amount = BigDecimal(200),
+                                    balanceType = BalanceType.AVAILABLE,
+                                ),
+                                CreateJournalEntry(
+                                    walletId = originatorWalletId,
+                                    subwalletType = SubwalletType.STOCK,
+                                    amount = BigDecimal(-200),
+                                    balanceType = BalanceType.HOLDING,
+                                ),
+                            ),
+                    )
+                }
+            }
+        }
     }
 }

@@ -21,6 +21,7 @@ class TransactionsInMemoryDatabase : TransactionsDatabase {
             Transaction(
                 id = id,
                 amount = request.amount,
+                batchId = request.batchId,
                 idempotencyKey = request.idempotencyKey,
                 originatorWalletId = request.originatorWalletId,
                 originatorSubwalletType = request.originatorSubwalletType,
