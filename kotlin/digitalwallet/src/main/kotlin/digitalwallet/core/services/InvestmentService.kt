@@ -146,6 +146,18 @@ class InvestmentService(
             )
 
         for (liquidationTransaction in transactions) {
+            val wallet =
+                walletRepo.findById(liquidationTransaction.originatorWalletId)
+                    ?: throw NoSuchElementException("Wallet ${liquidationTransaction.originatorWalletId} not found")
+            val realMoneyWallet =
+                walletRepo
+                    .find(
+                        WalletFilter(
+                            customerId = wallet.customerId,
+                            type = WalletType.REAL_MONEY,
+                        ),
+                    ).firstOrNull() ?: throw NoSuchElementException("Wallet not found for customer ${wallet.customerId}")
+
             val transaction =
                 transactionsService.processTransaction(
                     ProcessTransactionRequest(
@@ -153,6 +165,8 @@ class InvestmentService(
                         idempotencyKey = liquidationTransaction.id,
                         originatorWalletId = liquidationTransaction.originatorWalletId,
                         originatorSubwalletType = liquidationTransaction.originatorSubwalletType,
+                        beneficiaryWalletId = realMoneyWallet.id,
+                        beneficiarySubwalletType = SubwalletType.REAL_MONEY,
                         type = TransactionType.TRANSFER_FROM_HOLD,
                     ),
                 )

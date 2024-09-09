@@ -243,5 +243,72 @@ class InvestmentServiceTest : DescribeSpec() {
                 }
             }
         }
+
+        describe("sellFunds") {
+            it("works") {
+                val transaction1 =
+                    insertTransactionInMemory(
+                        db = transactionsInMemoryDatabase,
+                        amount = BigDecimal(100),
+                        idempotencyKey = "idempotencyKey1",
+                        originatorWalletId = "investmentWalletId1",
+                        originatorSubwalletType = SubwalletType.STOCK,
+                        type = TransactionType.HOLD,
+                        status = TransactionStatus.PROCESSING,
+                    )
+
+                val transaction2 =
+                    insertTransactionInMemory(
+                        db = transactionsInMemoryDatabase,
+                        amount = BigDecimal(100),
+                        idempotencyKey = "idempotencyKey2",
+                        originatorWalletId = "investmentWalletId2",
+                        originatorSubwalletType = SubwalletType.REAL_ESTATE,
+                        type = TransactionType.HOLD,
+                        status = TransactionStatus.PROCESSING,
+                    )
+
+                coEvery {
+                    transactionsServiceMock.processTransaction(any())
+                } returns insertTransactionInMemory(db = transactionsInMemoryDatabase, status = TransactionStatus.COMPLETED).toModel()
+
+                investmentService.sellFunds()
+
+                transaction1.status shouldBe TransactionStatus.COMPLETED
+                transaction2.status shouldBe TransactionStatus.COMPLETED
+
+                coVerify {
+                    transactionsServiceMock.processTransaction(
+                        request =
+                            ProcessTransactionRequest(
+                                amount = BigDecimal(100),
+                                idempotencyKey = transaction1.id,
+                                originatorWalletId = "investmentWalletId1",
+                                originatorSubwalletType = SubwalletType.STOCK,
+                                beneficiaryWalletId = "realMoneyWalletId1",
+                                beneficiarySubwalletType = SubwalletType.REAL_MONEY,
+                                type = TransactionType.TRANSFER_FROM_HOLD,
+                                metadata = null,
+                            ),
+                    )
+                }
+
+                coVerify {
+                    transactionsServiceMock.processTransaction(
+                        request =
+                            ProcessTransactionRequest(
+                                amount = BigDecimal(100),
+                                idempotencyKey = transaction2.id,
+                                originatorWalletId = "investmentWalletId2",
+                                originatorSubwalletType = SubwalletType.REAL_ESTATE,
+                                beneficiaryWalletId = "realMoneyWalletId2",
+                                beneficiarySubwalletType = SubwalletType.REAL_MONEY,
+                                type = TransactionType.TRANSFER_FROM_HOLD,
+                                metadata = null,
+                            ),
+                    )
+                }
+            }
+        }
     }
 }
