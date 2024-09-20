@@ -6,5 +6,5 @@ import core.domain.model.CreateInvestmentPolicyRequest
 trait InvestmentPolicyDatabase {
   def insert(request: CreateInvestmentPolicyRequest): InvestmentPolicy
 
-  def findById(id: String): InvestmentPolicy
+  def findById(id: String): Option[InvestmentPolicy]
 }
