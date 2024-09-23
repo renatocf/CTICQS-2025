@@ -5,7 +5,7 @@ import digitalwallet.core.domain.enums.TransactionStatus
 import digitalwallet.core.domain.models.ProcessTransactionRequest
 import digitalwallet.core.domain.models.Transaction
 import digitalwallet.core.exceptions.DbError
-import digitalwallet.core.exceptions.StatusTransitionNotAllowed
+import digitalwallet.core.exceptions.PartnerException
 import digitalwallet.core.exceptions.ValidationException
 import digitalwallet.ports.TransactionFilter
 import digitalwallet.ports.TransactionsDatabase
@@ -31,15 +31,13 @@ class TransactionsService(
             val message = e.message.toString()
             logger.error(message)
             transaction.updateStatus(transactionsRepo, TransactionStatus.FAILED, statusReason = message)
-        } catch (e: StatusTransitionNotAllowed) {
+        } catch (e: PartnerException) {
             val message = e.message.toString()
             logger.error(message)
-            transaction.reverse(ledgerService)
-            transaction.updateStatus(transactionsRepo, TransactionStatus.FAILED, statusReason = message)
+            transaction.updateStatus(transactionsRepo, TransactionStatus.TRANSIENT_ERROR, statusReason = message)
         } catch (e: DbError) {
             val message = e.message.toString()
             logger.error(message)
-            transaction.reverse(ledgerService)
             transaction.updateStatus(transactionsRepo, TransactionStatus.TRANSIENT_ERROR)
         }
 

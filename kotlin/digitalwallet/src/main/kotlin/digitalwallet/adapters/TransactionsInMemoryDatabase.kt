@@ -3,6 +3,7 @@ package digitalwallet.adapters
 import digitalwallet.core.domain.entities.Transaction
 import digitalwallet.core.domain.enums.TransactionStatus
 import digitalwallet.core.domain.models.ProcessTransactionRequest
+import digitalwallet.core.exceptions.TransactionNotFound
 import digitalwallet.ports.TransactionFilter
 import digitalwallet.ports.TransactionsDatabase
 import jakarta.inject.Singleton
@@ -52,9 +53,7 @@ class TransactionsInMemoryDatabase : TransactionsDatabase {
         statusReason: String?,
         at: LocalDateTime?,
     ) {
-        val transaction = transactions[transactionId]!!
-
-        super.validateTransition(status = transaction.status, newStatus = status)
+        val transaction = transactions[transactionId] ?: throw TransactionNotFound("Transaction $transactionId not found.")
 
         if (status == TransactionStatus.FAILED) {
             transaction.failedAt = at

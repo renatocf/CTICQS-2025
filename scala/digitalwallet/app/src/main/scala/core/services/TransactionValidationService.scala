@@ -2,10 +2,11 @@ package core.services
 
 import core.domain.entities.Transaction
 import core.domain.enums.SubwalletType.SubwalletType
-import core.domain.enums.{BalanceType, SubwalletType, TransactionType, WalletType}
+import core.domain.enums.TransactionStatus.TransactionStatus
+import core.domain.enums.{BalanceType, SubwalletType, TransactionStatus, TransactionType, WalletType}
 import core.domain.enums.WalletType.WalletType
 import core.domain.model.LedgerQuery
-import core.errors.{InsufficientFundsValidationError, MissingBeneficiarySubwalletType, MissingBeneficiaryWalletId, OriginatorSubwalletTypeValidationError, TransactionValidationError, TransferBetweenSubwalletsValidationError, TransferBetweenWalletsValidationError, TransferFromHoldNotAllowedValidationError, TransferNotAllowedValidationError, TransferValidationError, WalletNotFound}
+import core.errors.{InsufficientFundsValidationError, MissingBeneficiarySubwalletType, MissingBeneficiaryWalletId, OriginatorSubwalletTypeValidationError, StatusTransitionNotAllowed, TransactionError, TransactionValidationError, TransferBetweenSubwalletsValidationError, TransferBetweenWalletsValidationError, TransferFromHoldNotAllowedValidationError, TransferNotAllowedValidationError, TransferValidationError, WalletNotFound}
 import ports.WalletsDatabase
 
 class TransactionValidationService(walletsRepo: WalletsDatabase, walletsService: WalletsService, ledgerService: LedgerService) {
@@ -37,7 +38,7 @@ class TransactionValidationService(walletsRepo: WalletsDatabase, walletsService:
     } yield ()
   }
 
-  private def validateTransfer(transaction: Transaction): Either[TransactionValidationError, Unit] = {
+  private def validateTransfer(transaction: Transaction): Either[TransactionError, Unit] = {
     for {
       beneficiarySubwalletType <- transaction.beneficiarySubwalletType
         .toRight(MissingBeneficiarySubwalletType(s"Transfer from hold ${transaction.id} must contain beneficiaryWalletId"))
@@ -50,7 +51,7 @@ class TransactionValidationService(walletsRepo: WalletsDatabase, walletsService:
     } yield ()
   }
 
-  private def validateTransferFromHold(transaction: Transaction): Either[TransactionValidationError, Unit] = {
+  private def validateTransferFromHold(transaction: Transaction): Either[TransactionError, Unit] = {
     for {
       originatorWallet <- walletsRepo.findById(transaction.originatorWalletId)
         .toRight(WalletNotFound(s"Wallet ${transaction.originatorWalletId} not found"))

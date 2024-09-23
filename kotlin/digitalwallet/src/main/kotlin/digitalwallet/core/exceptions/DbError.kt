@@ -2,4 +2,4 @@ package digitalwallet.core.exceptions
 
 open class DbError(message: String) : Exception(message)
 
-class StatusTransitionNotAllowed(message: String) : DbError(message)
+class TransactionNotFound(message: String) : DbError(message)

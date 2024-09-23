@@ -47,10 +47,9 @@ class TransactionInMemoryDatabase extends TransactionDatabase {
       .toList
   }
 
-  override def update(transactionId: String, status: TransactionStatus, statusReason: Option[String], at: Option[LocalDateTime]): Either[TransactionDbError, Unit] = {
+  override def update(transactionId: String, status: TransactionStatus, statusReason: Option[String], at: Option[LocalDateTime]): Either[TransactionDbError, Transaction] = {
     for {
       transaction <- transactions.get(transactionId).toRight(TransactionNotFound(s"Transaction not found: $transactionId"))
-      _ <- validateTransition(transaction.status, status)
     } yield {
       status match {
         case TransactionStatus.Failed => transaction.failedAt = at
@@ -60,6 +59,8 @@ class TransactionInMemoryDatabase extends TransactionDatabase {
 
       transaction.status = status
       transaction.statusReason = statusReason
+
+      transaction
     }
   }
 
