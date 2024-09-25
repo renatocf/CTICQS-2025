@@ -2,11 +2,11 @@ package core.services
 
 import core.domain.entities.{Transaction, Wallet}
 import core.domain.enums.{BalanceType, SubwalletType, TransactionStatus, TransactionType, WalletType}
-import core.domain.model.{InvestmentRequest, LedgerQuery, ProcessTransactionRequest}
-import core.errors.{InvestmentFailedError, WalletNotFound}
-import ports.{WalletFilter, WalletsDatabase}
+import core.domain.model.{CreateTransactionRequest, InvestmentMovementRequest, InvestmentRequest, LedgerQuery, LiquidationRequest}
+import core.errors.{InvestmentFailedError, LiquidationFailedError, WalletNotFound}
+import ports.{InvestmentPolicyDatabase, WalletFilter, WalletsDatabase}
 
-class WalletsService(walletsRepo: WalletsDatabase, ledgerService: LedgerService, transactionsService: TransactionsService) {
+class WalletsService(walletsRepo: WalletsDatabase, investmentPolicyRepo: InvestmentPolicyDatabase, ledgerService: LedgerService, transactionsService: TransactionsService, investmentService: InvestmentService) {
   def getAvailableBalance(wallet: Wallet): BigDecimal = {
     val ledgerQuery = wallet.walletType match {
       case WalletType.RealMoney =>
@@ -51,17 +51,14 @@ class WalletsService(walletsRepo: WalletsDatabase, ledgerService: LedgerService,
     val wallets = walletsRepo.find(WalletFilter(customerId = Some(request.customerId), walletType = Some(WalletType.RealMoney)))
 
     wallets match {
-      case _ => Left(WalletNotFound(s"Wallet not found for customer ${request.customerId}"))
       case List(wallet) =>
-        val createTransactionRequest = ProcessTransactionRequest(
+        val transaction = transactionsService.create(CreateTransactionRequest(
           amount = request.amount,
           idempotencyKey = request.idempotencyKey,
           originatorWalletId = wallet.id,
           originatorSubwalletType = SubwalletType.RealMoney,
           transactionType = TransactionType.Hold
-        )
-
-        val transaction = transactionsService.create(createTransactionRequest)
+        ))
 
         for {
           processTransactionTuple <- transactionsService.process(transaction).left.map { e =>
@@ -70,6 +67,31 @@ class WalletsService(walletsRepo: WalletsDatabase, ledgerService: LedgerService,
           }
           executedTransaction <- transactionsService.execute(processTransactionTuple).left.map(e => InvestmentFailedError(e.message))
         } yield executedTransaction
+
+      case _ =>
+        Left(InvestmentFailedError(s"None or multiple wallets found for customer ${request.customerId}"))
+    }
+  }
+
+  def liquidate(request: LiquidationRequest): Either[LiquidationFailedError, Unit] = {
+    val wallets = walletsRepo.find(WalletFilter(customerId = Some(request.customerId), walletType = Some(WalletType.Investment)))
+
+    wallets match {
+      case List(wallet) =>
+        investmentPolicyRepo
+          .findById(wallet.policyId)
+          .toRight(LiquidationFailedError(s"Investment policy ${wallet.policyId} not found"))
+          .flatMap(investmentPolicy =>
+            investmentService
+              .executeMovementWithInvestmentPolicy(InvestmentMovementRequest(
+                amount = request.amount,
+                idempotencyKey = request.idempotencyKey,
+                walletId = wallet.id,
+                investmentPolicy = investmentPolicy,
+                transactionType = TransactionType.Hold
+              )).left.map(e => LiquidationFailedError(e.message))
+          )
+      case _ => Left(LiquidationFailedError(s"None or multiple wallets found for customer ${request.customerId}"))
     }
   }
 }

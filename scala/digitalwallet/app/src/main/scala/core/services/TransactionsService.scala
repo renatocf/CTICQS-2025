@@ -3,9 +3,9 @@ package core.services
 import core.domain.entities.Transaction
 import core.domain.enums.TransactionStatus.TransactionStatus
 import core.domain.enums.{BalanceType, TransactionStatus, TransactionType}
-import core.domain.model.{CreateJournalEntry, ProcessTransactionRequest}
+import core.domain.model.{CreateJournalEntry, CreateTransactionRequest}
 import core.errors.{ExecutionFailed, MissingBeneficiarySubwalletType, MissingBeneficiaryWalletId, PartnerError, TransactionError}
-import ports.TransactionDatabase
+import ports.{TransactionDatabase, TransactionFilter}
 
 class TransactionsService(
   transactionsRepo: TransactionDatabase,
@@ -16,7 +16,7 @@ class TransactionsService(
   private type Action = Transaction => Either[PartnerError, Unit]
   private type ProcessTransactionTuple = (Transaction, List[CreateJournalEntry], TransactionStatus, Option[Action])
 
-  def create(request: ProcessTransactionRequest): Transaction = {
+  def create(request: CreateTransactionRequest): Transaction = {
     transactionsRepo.insert(request)
   }
 
@@ -49,6 +49,16 @@ class TransactionsService(
 
   def updateStatus(transactionId: String, status: TransactionStatus): Unit = {
     transactionsRepo.update(transactionId, status)
+  }
+
+  def failBatch(batchId: String): Unit = {
+    transactionsRepo
+      .find(TransactionFilter(
+        batchId = Some(batchId)
+      ))
+      .foreach(transaction => {
+        updateStatus(transaction.id, TransactionStatus.Failed)
+      })
   }
 
   private def processTransaction(transaction: Transaction): Either[TransactionError, ProcessTransactionTuple] = {
@@ -164,8 +174,26 @@ class TransactionsService(
       )
 
       val partnerAction: Action = partnerService.executeInternalTransfer
-      (transaction, journalEntries, TransactionStatus.Completed, Some(partnerAction),)
+      (transaction, journalEntries, TransactionStatus.Completed, Some(partnerAction))
     }
   }
 
+  def releaseHold(transaction: Transaction): Unit = {
+    val journalEntries = List(
+      CreateJournalEntry(
+        walletId = Some(transaction.originatorWalletId),
+        subwalletType = transaction.originatorSubwalletType,
+        balanceType = BalanceType.Available,
+        amount = transaction.amount
+      ),
+      CreateJournalEntry(
+        walletId = Some(transaction.originatorWalletId),
+        subwalletType = transaction.originatorSubwalletType,
+        balanceType = BalanceType.Holding,
+        amount = -transaction.amount
+      )
+    )
+
+    ledgerService.postJournalEntries(journalEntries)
+  }
 }

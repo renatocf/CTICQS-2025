@@ -3,7 +3,7 @@ package adapters
 import core.domain.entities.Transaction
 import core.domain.enums.TransactionStatus
 import core.domain.enums.TransactionStatus.TransactionStatus
-import core.domain.model.ProcessTransactionRequest
+import core.domain.model.{CreateTransactionRequest}
 import core.errors.{TransactionDbError, TransactionNotFound}
 import ports.{TransactionDatabase, TransactionFilter}
 
@@ -14,7 +14,7 @@ import scala.collection.mutable
 class TransactionInMemoryDatabase extends TransactionDatabase {
   private val transactions: mutable.Map[String, Transaction] = mutable.Map()
 
-  override def insert(request: ProcessTransactionRequest): Transaction = {
+  override def insert(request: CreateTransactionRequest): Transaction = {
     val id = UUID.randomUUID().toString
 
     val transaction = Transaction(

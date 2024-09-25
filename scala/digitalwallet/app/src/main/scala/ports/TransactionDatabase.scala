@@ -4,7 +4,7 @@ import core.domain.entities.Transaction
 import core.domain.enums.SubwalletType.SubwalletType
 import core.domain.enums.TransactionStatus
 import core.domain.enums.TransactionStatus.TransactionStatus
-import core.domain.model.ProcessTransactionRequest
+import core.domain.model.{CreateTransactionRequest}
 import core.errors.{StatusTransitionNotAllowed, TransactionDbError}
 
 import java.time.LocalDateTime
@@ -17,7 +17,7 @@ case class TransactionFilter(
 )
 
 trait TransactionDatabase {
-  def insert(request: ProcessTransactionRequest): Transaction
+  def insert(request: CreateTransactionRequest): Transaction
   def find(filter: TransactionFilter): List[Transaction]
 
   def update(

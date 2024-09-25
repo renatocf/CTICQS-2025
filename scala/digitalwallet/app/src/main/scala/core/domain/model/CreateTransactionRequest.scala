@@ -3,7 +3,7 @@ package core.domain.model
 import core.domain.enums.SubwalletType.SubwalletType
 import core.domain.enums.TransactionType.TransactionType
 
-case class ProcessTransactionRequest(
+case class CreateTransactionRequest(
   amount: BigDecimal,
   batchId: Option[String] = None,
   idempotencyKey: String,
