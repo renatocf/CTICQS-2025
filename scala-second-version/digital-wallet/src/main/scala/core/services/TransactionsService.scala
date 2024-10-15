@@ -7,14 +7,15 @@ import core.domain.model.{CreateJournalEntry, CreateTransactionRequest}
 import core.errors.{TransactionServiceError, *}
 import ports.{TransactionDatabase, TransactionFilter}
 
+type Action = Transaction => Either[PartnerServiceError, Unit]
+type ProcessTransactionTuple = (Transaction, List[CreateJournalEntry], TransactionStatus, Option[Action])
+
 class TransactionsService(
   transactionsRepo: TransactionDatabase,
   validationService: TransactionValidationService,
   partnerService: PartnerService,
   ledgerService: LedgerService,
 ) {
-  private type Action = Transaction => Either[PartnerServiceError, Unit]
-  private type ProcessTransactionTuple = (Transaction, List[CreateJournalEntry], TransactionStatus, Option[Action])
 
   def create(request: CreateTransactionRequest): Either[CreationError, Transaction] = {
     transactionsRepo

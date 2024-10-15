@@ -4,7 +4,7 @@ import core.domain.entities.InvestmentPolicy
 import core.domain.enums.SubwalletType.SubwalletType
 import core.domain.enums.TransactionType.TransactionType
 
-case class InvestmentMovementRequest(
+case class MovementRequest(
   amount: BigDecimal,
   idempotencyKey: String,
   walletId: String,

@@ -32,7 +32,15 @@ class TransactionValidationService(walletsRepo: WalletsDatabase, walletsService:
 
   private def validateHold(transaction: Transaction): Either[TransactionValidationError, Unit] = {
     for {
-      _ <- validateOriginatorSubwalletType(transaction.originatorSubwalletType, List(SubwalletType.RealMoney, SubwalletType.Investment))
+      _ <- validateOriginatorSubwalletType(
+        transaction.originatorSubwalletType, 
+        List(
+          SubwalletType.RealMoney, 
+          SubwalletType.Stock, 
+          SubwalletType.Bonds, 
+          SubwalletType.RealEstate, 
+          SubwalletType.Cryptocurrency)
+      )
       _ <- validateBalance(transaction.originatorWalletId, transaction.amount)
     } yield ()
   }
@@ -47,6 +55,8 @@ class TransactionValidationService(walletsRepo: WalletsDatabase, walletsService:
         beneficiarySubwalletType,
         Set((SubwalletType.RealMoney, SubwalletType.EmergencyFunds), (SubwalletType.EmergencyFunds, SubwalletType.RealMoney))
       )
+      
+      _ <- validateBalance(transaction.originatorWalletId, transaction.amount)
     } yield ()
   }
 
@@ -59,7 +69,7 @@ class TransactionValidationService(walletsRepo: WalletsDatabase, walletsService:
         .toRight(TransactionValidationFailed(s"Transfer from hold ${transaction.id} must contain beneficiaryWalletId"))
 
       beneficiaryWallet <- walletsRepo.findById(beneficiaryWalletId)
-        .toRight(TransactionValidationFailed(s"Wallet ${transaction.beneficiaryWalletId} not found"))
+        .toRight(TransactionValidationFailed(s"Wallet ${beneficiaryWalletId} not found"))
 
       _ <- validateTransferBetweenWallets(
         originatorWallet.walletType,
@@ -82,14 +92,15 @@ class TransactionValidationService(walletsRepo: WalletsDatabase, walletsService:
     for {
       wallet <- walletsRepo.findById(originatorWalletId)
         .toRight(TransactionValidationFailed(s"Wallet $originatorWalletId not found"))
-    } yield {
-      val balance = walletsService.getAvailableBalance(wallet)
-      if (amount > balance) {
+
+      balance = walletsService.getAvailableBalance(wallet)
+
+      result <- if (amount > balance) {
         Left(InsufficientFundsValidationError(s"Wallet $originatorWalletId has no sufficient funds"))
       } else {
         Right(())
       }
-    }
+    } yield ()
 
   private def validateTransferBetweenSubwallets(originatorSubwalletType: SubwalletType, beneficiarySubwalletType: SubwalletType, validTransferPairs: Set[(SubwalletType, SubwalletType)]): Either[TransactionValidationError, Unit] = {
     if (validTransferPairs.contains((originatorSubwalletType, beneficiarySubwalletType))) {
@@ -108,17 +119,9 @@ class TransactionValidationService(walletsRepo: WalletsDatabase, walletsService:
   }
 
   private def validatePendingBalance(walletId: String, subwalletType: SubwalletType, amount: BigDecimal): Either[TransactionValidationError, Unit] = {
-    val originatorSubwalletPendingBalance = ledgerService.getBalance(
-      walletId,
-      List(
-        LedgerQuery(
-          subwalletType = subwalletType,
-          balanceType = BalanceType.Holding
-        )
-      )
-    )
+    val originatorSubwalletPendingBalance = walletsService.getSubwalletPendingBalance(walletId, subwalletType)
 
     if (amount <= originatorSubwalletPendingBalance) Right(())
-    else Left(InsufficientFundsValidationError("Wallet has no sufficient funds"))
+    else Left(InsufficientFundsValidationError(s"Wallet ${walletId} has no sufficient funds"))
   }
 }

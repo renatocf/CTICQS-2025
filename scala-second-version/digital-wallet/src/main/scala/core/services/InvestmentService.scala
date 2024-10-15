@@ -2,14 +2,14 @@ package core.services
 
 import core.domain.enums.SubwalletType.SubwalletType
 import core.domain.enums.{SubwalletType, TransactionStatus, TransactionType, WalletType}
-import core.domain.model.{CreateTransactionRequest, InvestmentMovementRequest}
+import core.domain.model.{CreateTransactionRequest, MovementRequest}
 import core.errors.{InvestmentFailedError, InvestmentServiceError, InvestmentServiceInternalError, ProcessTransactionFailed}
 import ports.{InvestmentPolicyDatabase, TransactionDatabase, TransactionFilter, WalletFilter, WalletsDatabase}
 import cats.implicits.*
 import core.domain.entities.Transaction
 
 class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: WalletsDatabase, investmentPolicyRepo: InvestmentPolicyDatabase, transactionsService: TransactionsService) {
-  def executeMovementWithInvestmentPolicy(request: InvestmentMovementRequest): Either[InvestmentServiceError, Unit] = {
+  def executeMovementWithInvestmentPolicy(request: MovementRequest): Either[InvestmentServiceError, Unit] = {
     val allocationStrategy = request.investmentPolicy.allocationStrategy.toList
 
     allocationStrategy.traverse { case (subwalletType, percentage) =>
@@ -43,7 +43,7 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
     }
   }
 
-  private def getTransactionDetails(request: InvestmentMovementRequest, subwalletType: SubwalletType): Either[InvestmentServiceError, (SubwalletType, Option[String], Option[SubwalletType])] = {
+  private def getTransactionDetails(request: MovementRequest, subwalletType: SubwalletType): Either[InvestmentServiceError, (SubwalletType, Option[String], Option[SubwalletType])] = {
     request.transactionType match {
       case TransactionType.Hold =>
         Right((subwalletType, None, None))
@@ -89,7 +89,7 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
                 .headOption
                 .toRight(InvestmentServiceInternalError(s"Investment wallet not found for ${wallet.customerId}"))
           } yield {
-            executeMovementWithInvestmentPolicy(InvestmentMovementRequest(
+            executeMovementWithInvestmentPolicy(MovementRequest(
               amount = investmentTransaction.amount,
               idempotencyKey = investmentTransaction.idempotencyKey,
               walletId = investmentTransaction.originatorWalletId,

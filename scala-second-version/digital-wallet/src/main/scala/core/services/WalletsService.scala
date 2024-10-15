@@ -2,6 +2,7 @@ package core.services
 
 import core.domain.entities.{Transaction, Wallet}
 import core.domain.enums.*
+import core.domain.enums.SubwalletType.SubwalletType
 import core.domain.model.*
 import core.errors.{InvestmentFailedError, LiquidationFailedError}
 import ports.{InvestmentPolicyDatabase, WalletFilter, WalletsDatabase}
@@ -45,6 +46,18 @@ class WalletsService(walletsRepo: WalletsDatabase, investmentPolicyRepo: Investm
     }
 
     ledgerService.getBalance(wallet.id, ledgerQuery)
+  }
+  
+  def getSubwalletPendingBalance(walletId: String, subwalletType: SubwalletType): BigDecimal = {
+    ledgerService.getBalance(
+      walletId,
+      List(
+        LedgerQuery(
+          subwalletType = subwalletType,
+          balanceType = BalanceType.Holding
+        )
+      )
+    )
   }
 
   def invest(request: InvestmentRequest): Either[InvestmentFailedError, Transaction] = {
@@ -98,7 +111,7 @@ class WalletsService(walletsRepo: WalletsDatabase, investmentPolicyRepo: Investm
           .toRight(LiquidationFailedError(s"Investment policy ${wallet.policyId} not found"))
           .flatMap(investmentPolicy =>
             investmentService
-              .executeMovementWithInvestmentPolicy(InvestmentMovementRequest(
+              .executeMovementWithInvestmentPolicy(MovementRequest(
                 amount = request.amount,
                 idempotencyKey = request.idempotencyKey,
                 walletId = wallet.id,
