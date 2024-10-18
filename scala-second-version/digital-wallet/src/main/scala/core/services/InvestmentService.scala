@@ -7,8 +7,11 @@ import core.errors.{CreateTransactionFailed, ExecuteTransactionFailed, Investmen
 import ports.{InvestmentPolicyDatabase, TransactionDatabase, TransactionFilter, WalletFilter, WalletsDatabase}
 import cats.implicits.*
 import core.domain.entities.Transaction
+import core.utils.Library
 
 class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: WalletsDatabase, investmentPolicyRepo: InvestmentPolicyDatabase, transactionsService: TransactionsService) {
+  val lib = Library()
+  
   def executeMovementWithInvestmentPolicy(request: MovementRequest): Either[InvestmentServiceError, Unit] = {
     val allocationStrategy = request.investmentPolicy.allocationStrategy.toList
 
@@ -39,16 +42,19 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
           }
         } yield processTransactionTuple
       }.flatMap { processTransactionTuples =>
-        val failures = 
-          processTransactionTuples
-            .map { tuple => transactionsService.execute(tuple) }
-            .collect { case Left(error) => error }
-      
-        if (failures.nonEmpty) {
-          Left(ExecuteTransactionFailed(s"${failures.size} transaction(s) failed: ${failures.map(f  => f.message).mkString(", ")}"))
-        } else {
-          Right(())
-        }
+        lib.maybeLogError(() => {
+            val failures =
+              processTransactionTuples
+                .map { tuple => transactionsService.execute(tuple) }
+                .collect { case Left(error) => error }
+  
+            if (failures.nonEmpty) {
+              Left(ExecuteTransactionFailed(s"${failures.size} transaction(s) failed: ${failures.map(f => f.message).mkString(", ")}"))
+            } else {
+              Right(())
+            }
+          }
+        )
       }
   }
 

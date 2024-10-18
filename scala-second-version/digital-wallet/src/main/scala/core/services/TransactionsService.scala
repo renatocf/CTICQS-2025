@@ -6,6 +6,9 @@ import core.domain.enums.{BalanceType, TransactionStatus, TransactionType}
 import core.domain.model.{CreateJournalEntry, CreateTransactionRequest}
 import core.errors.{TransactionServiceError, *}
 import ports.{TransactionDatabase, TransactionFilter}
+import core.utils as lib
+import core.utils.Library
+import cats.implicits.*
 
 type Action = Transaction => Either[PartnerServiceError, Unit]
 type ProcessTransactionTuple = (Transaction, List[CreateJournalEntry], TransactionStatus, Option[Action])
@@ -16,6 +19,7 @@ class TransactionsService(
   partnerService: PartnerService,
   ledgerService: LedgerService,
 ) {
+  private val lib = Library()
 
   def create(request: CreateTransactionRequest): Either[CreationError, Transaction] = {
     transactionsRepo
@@ -25,19 +29,19 @@ class TransactionsService(
   }
 
   def process(transaction: Transaction): Either[ProcessError, ProcessTransactionTuple] = {
-    for {
-      _ <- validationService.validateTransaction(transaction).left.map(e => ProcessError(e.message))
-      processTransactionTuple <- processTransaction(transaction).left.map(e => ProcessError(e.message))
-    } yield {
-      processTransactionTuple
-    }
+    lib.maybeLogError(() => {
+      for {
+        _ <- validationService.validateTransaction(transaction).left.map(e => ProcessError(e.message))
+        processTransactionTuple <- processTransaction(transaction).left.map(e => ProcessError(e.message))
+      } yield processTransactionTuple
+    })
   }
 
   def execute(tuple: ProcessTransactionTuple): Either[ExecutionError, Transaction] = {
     val (transaction, journalEntries, statusOnSuccess, maybeExecuteAction) = tuple
 
     val actionResult: Either[PartnerServiceError, Unit] = maybeExecuteAction match {
-      case Some(action) => action(transaction)
+      case Some(action) => lib.maybeLogError(() => action(transaction))
       case None => Right(())
     }
 
@@ -199,5 +203,31 @@ class TransactionsService(
     )
 
     ledgerService.postJournalEntries(journalEntries)
+  }
+
+  def retryBatch(batchId: String): Either[TransactionServiceError, Unit] = {
+    transactionsRepo
+      .find(TransactionFilter(batchId = Some(batchId)))
+      .filter(t => t.status == TransactionStatus.TransientError)
+      .traverse { t =>
+        processTransaction(t).left.map { e =>
+          failBatch(batchId)
+          updateStatus(batchId, TransactionStatus.Failed)
+          ProcessError(e.message)
+        }
+      }
+      .flatMap(tuples => {
+        val failures =
+          tuples
+            .map { tuple => lib.retry(() => execute(tuple), 3) }
+            .collect { case Left(error) => error }
+
+        if (failures.nonEmpty) {
+          Left(ExecutionError(s"Could not execute batch successfully."))
+        } else {
+          updateStatus(batchId, TransactionStatus.Completed)
+          Right(())
+        }
+      })
   }
 }
