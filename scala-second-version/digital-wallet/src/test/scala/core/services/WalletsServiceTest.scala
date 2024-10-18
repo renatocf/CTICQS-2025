@@ -54,7 +54,7 @@ class WalletsServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Match
       id = "realMoneyWalletId",
       customerId = customerId,
       walletType = WalletType.RealMoney,
-      policyId = investmentPolicy.id
+      policyId = Some(investmentPolicy.id)
     )
 
     utils.insertWalletInMemory(
@@ -62,7 +62,7 @@ class WalletsServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Match
       id = "investmentWalletId",
       customerId = customerId,
       walletType = WalletType.Investment,
-      policyId = investmentPolicy.id
+      policyId = Some(investmentPolicy.id)
     )
 
     utils.insertWalletInMemory(
@@ -70,7 +70,6 @@ class WalletsServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Match
       id = "emergencyFundsWalletId",
       customerId = customerId,
       walletType = WalletType.EmergencyFunds,
-      policyId = investmentPolicy.id
     )
   }
 
@@ -178,7 +177,7 @@ class WalletsServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Match
       case Left(error) =>
         error shouldBe InvestmentFailedError("message")
       case Right(_) =>
-        fail(s"Expected Left but got Right with error")
+        fail(s"Expected Left but got Right")
     }
 
     verify(transactionsServiceMock).create(ArgumentMatchers.eq(CreateTransactionRequest(
@@ -211,16 +210,29 @@ class WalletsServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Match
       status = TransactionStatus.Creating
     )
 
+    val failedTransaction = Transaction(
+      id = UUID.randomUUID().toString,
+      transactionType = TransactionType.Hold,
+      originatorSubwalletType = SubwalletType.RealMoney,
+      amount = BigDecimal(100),
+      originatorWalletId = "realMoneyWalletId",
+      beneficiarySubwalletType = None,
+      beneficiaryWalletId = None,
+      idempotencyKey = "idempotencyKey",
+      insertedAt = LocalDateTime.now(),
+      status = TransactionStatus.Failed
+    )
+
     when(transactionsServiceMock.create(any())).thenReturn(Right(transaction))
     when(transactionsServiceMock.process(any())).thenReturn(Left(ProcessError("message")))
-    doNothing().when(transactionsServiceMock).updateStatus(any(), any())
+    when(transactionsServiceMock.updateStatus(any(), any())).thenReturn(failedTransaction)
 
     val result = walletsService.invest(request)
     result match {
       case Left(error) =>
         error shouldBe InvestmentFailedError("message")
       case Right(_) =>
-        fail(s"Expected Left but got Right with error")
+        fail(s"Expected Left but got Right")
     }
 
     verify(transactionsServiceMock).create(ArgumentMatchers.eq(CreateTransactionRequest(
@@ -295,7 +307,7 @@ class WalletsServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Match
       case Left(error) =>
         error shouldBe InvestmentFailedError("message")
       case Right(_) =>
-        fail(s"Expected Left but got Right with error")
+        fail(s"Expected Left but got Right")
     }
 
     verify(transactionsServiceMock)
@@ -360,7 +372,7 @@ class WalletsServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Match
       case Left(error) =>
         error shouldBe LiquidationFailedError("message")
       case Right(_) =>
-        fail("Expected Left but got Right with error")
+        fail("Expected Left but got Right")
     }
 
     verify(investmentServiceMock).executeMovementWithInvestmentPolicy(

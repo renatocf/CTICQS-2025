@@ -26,5 +26,5 @@ trait TransactionDatabase {
     status: TransactionStatus,
     statusReason: Option[String] = None,
     at: Option[LocalDateTime] = Some(LocalDateTime.now())
-  ): Either[TransactionDbError, Transaction]
+  ): Transaction
 }

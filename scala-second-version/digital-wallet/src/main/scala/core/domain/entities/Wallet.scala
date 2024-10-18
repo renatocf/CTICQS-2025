@@ -8,6 +8,6 @@ case class Wallet(
   val id: String,
   val customerId: String,
   val walletType: WalletType,
-  val policyId: String,
+  val policyId: Option[String],
   val insertedAt: LocalDateTime,
 )

@@ -106,19 +106,22 @@ class WalletsService(walletsRepo: WalletsDatabase, investmentPolicyRepo: Investm
 
     wallets match {
       case List(wallet) =>
-        investmentPolicyRepo
-          .findById(wallet.policyId)
-          .toRight(LiquidationFailedError(s"Investment policy ${wallet.policyId} not found"))
-          .flatMap(investmentPolicy =>
-            investmentService
-              .executeMovementWithInvestmentPolicy(MovementRequest(
-                amount = request.amount,
-                idempotencyKey = request.idempotencyKey,
-                walletId = wallet.id,
-                investmentPolicy = investmentPolicy,
-                transactionType = TransactionType.Hold
-              )).left.map(e => LiquidationFailedError(e.message))
-          )
+          for {
+            policyId <- wallet.policyId.toRight(LiquidationFailedError(s"Wallet ${wallet.id} has no policyId"))
+            
+            investmentPolicy <-
+              investmentPolicyRepo
+                .findById(policyId)
+                .toRight(LiquidationFailedError(s"Investment policy ${wallet.policyId} not found"))
+            
+            _ <- investmentService.executeMovementWithInvestmentPolicy(MovementRequest(
+                  amount = request.amount,
+                  idempotencyKey = request.idempotencyKey,
+                  walletId = wallet.id,
+                  investmentPolicy = investmentPolicy,
+                  transactionType = TransactionType.Hold
+                )).left.map(e => LiquidationFailedError(e.message))
+          } yield ()
       case _ => Left(LiquidationFailedError(s"None or multiple wallets found for customer ${request.customerId}"))
     }
   }

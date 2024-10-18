@@ -3,7 +3,7 @@ package core.services
 import core.domain.enums.SubwalletType.SubwalletType
 import core.domain.enums.{SubwalletType, TransactionStatus, TransactionType, WalletType}
 import core.domain.model.{CreateTransactionRequest, MovementRequest}
-import core.errors.{InvestmentFailedError, InvestmentServiceError, InvestmentServiceInternalError, ProcessTransactionFailed}
+import core.errors.{CreateTransactionFailed, ExecuteTransactionFailed, InvestmentFailedError, InvestmentServiceError, InvestmentServiceInternalError, ProcessTransactionFailed}
 import ports.{InvestmentPolicyDatabase, TransactionDatabase, TransactionFilter, WalletFilter, WalletsDatabase}
 import cats.implicits.*
 import core.domain.entities.Transaction
@@ -12,35 +12,44 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
   def executeMovementWithInvestmentPolicy(request: MovementRequest): Either[InvestmentServiceError, Unit] = {
     val allocationStrategy = request.investmentPolicy.allocationStrategy.toList
 
-    allocationStrategy.traverse { case (subwalletType, percentage) =>
-      for {
-        (originatorSubwalletType, beneficiaryWalletId, beneficiarySubwalletType) <- getTransactionDetails(request, subwalletType)
+    allocationStrategy
+      .filter((_, percentage) => percentage != BigDecimal(0))
+      .traverse { case (subwalletType, percentage) =>
+        for {
+          (originatorSubwalletType, beneficiaryWalletId, beneficiarySubwalletType) <- getTransactionDetails(request, subwalletType)
 
-        createTransactionRequest = CreateTransactionRequest(
-          amount = request.amount * percentage,
-          batchId = Some(request.idempotencyKey),
-          idempotencyKey = s"${request.idempotencyKey}_$subwalletType",
-          originatorWalletId = request.walletId,
-          originatorSubwalletType = originatorSubwalletType,
-          beneficiaryWalletId = beneficiaryWalletId,
-          beneficiarySubwalletType = beneficiarySubwalletType,
-          transactionType = request.transactionType
-        )
+          createTransactionRequest = CreateTransactionRequest(
+            amount = request.amount * percentage,
+            batchId = Some(request.idempotencyKey),
+            idempotencyKey = s"${request.idempotencyKey}_$subwalletType",
+            originatorWalletId = request.walletId,
+            originatorSubwalletType = originatorSubwalletType,
+            beneficiaryWalletId = beneficiaryWalletId,
+            beneficiarySubwalletType = beneficiarySubwalletType,
+            transactionType = request.transactionType
+          )
 
-        transaction <- transactionsService.create(createTransactionRequest).left.map { e =>
-          InvestmentServiceInternalError(s"Failed to create transaction: ${e.message}")
+          transaction <- transactionsService.create(createTransactionRequest).left.map { e =>
+            CreateTransactionFailed(s"Failed to create transaction: ${e.message}")
+          }
+
+          processTransactionTuple <- transactionsService.process(transaction).left.map { e =>
+            transactionsService.failBatch(request.idempotencyKey)
+            ProcessTransactionFailed(s"Failed to process transaction ${transaction.id}: ${e.message}")
+          }
+        } yield processTransactionTuple
+      }.flatMap { processTransactionTuples =>
+        val failures = 
+          processTransactionTuples
+            .map { tuple => transactionsService.execute(tuple) }
+            .collect { case Left(error) => error }
+      
+        if (failures.nonEmpty) {
+          Left(ExecuteTransactionFailed(s"${failures.size} transaction(s) failed: ${failures.map(f  => f.message).mkString(", ")}"))
+        } else {
+          Right(())
         }
-
-        processTransactionTuple <- transactionsService.process(transaction).left.map { e =>
-          transactionsService.failBatch(request.idempotencyKey)
-          ProcessTransactionFailed(s"Failed to process transaction ${transaction.id}: ${e.message}")
-        }
-      } yield processTransactionTuple
-    }.map { processTransactionTuples =>
-      processTransactionTuples.foreach { tuple =>
-        transactionsService.execute(tuple)
       }
-    }
   }
 
   private def getTransactionDetails(request: MovementRequest, subwalletType: SubwalletType): Either[InvestmentServiceError, (SubwalletType, Option[String], Option[SubwalletType])] = {
@@ -76,9 +85,13 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
               walletsRepo
                 .findById(investmentTransaction.originatorWalletId)
                 .toRight(InvestmentServiceInternalError(s"Wallet ${investmentTransaction.originatorWalletId} not found"))
+            policyId <-
+              wallet
+                .policyId
+                .toRight(InvestmentServiceInternalError(s"Wallet ${wallet.id} has no policyId"))
             investmentPolicy <-
               investmentPolicyRepo
-                .findById(wallet.policyId)
+                .findById(policyId)
                 .toRight(InvestmentServiceInternalError(s"Investment policy ${wallet.policyId} not found"))
             investmentWallet <-
               walletsRepo
@@ -93,14 +106,26 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
               amount = investmentTransaction.amount,
               idempotencyKey = investmentTransaction.idempotencyKey,
               walletId = investmentTransaction.originatorWalletId,
+              walletSubwalletType = Some(SubwalletType.RealMoney),
               targetWalletId = Some(investmentWallet.id),
               investmentPolicy = investmentPolicy,
               transactionType = TransactionType.TransferFromHold
-            )).left.map(_ => {
-              // fail the investment transaction gracefully
-              transactionsService.releaseHold(investmentTransaction)
-              transactionsService.updateStatus(investmentTransaction.id, TransactionStatus.Failed)
-            })
+            ))
+            .fold(
+              error => {
+                error match {
+                  case ProcessTransactionFailed(_) =>
+                    // Fail the investment transaction gracefully
+                    transactionsService.releaseHold(investmentTransaction)
+                    transactionsService.updateStatus(investmentTransaction.id, TransactionStatus.Failed)
+                  case _ => ()
+                }
+              },
+              _ => {
+                // Update the transaction status to completed
+                transactionsService.updateStatus(investmentTransaction.id, TransactionStatus.Completed)
+              }
+            )
           }
       })
   }
@@ -121,7 +146,7 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
             )
         )
       )
-      .foreach(liquidationTransaction => {
+      .map(liquidationTransaction => {
         for {
           wallet <-
             walletsRepo
@@ -138,7 +163,7 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
           transaction <- transactionsService.create(
               CreateTransactionRequest(
                 amount = liquidationTransaction.amount,
-                idempotencyKey = liquidationTransaction.idempotencyKey,
+                idempotencyKey = s"${liquidationTransaction.idempotencyKey}_liquidation",
                 originatorWalletId = liquidationTransaction.originatorWalletId,
                 originatorSubwalletType = liquidationTransaction.originatorSubwalletType,
                 beneficiaryWalletId = Some(realMoneyWallet.id),
@@ -146,8 +171,9 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
                 transactionType = TransactionType.TransferFromHold,
               )
             ).left.map { e =>
-              InvestmentServiceInternalError(e.message)
+              CreateTransactionFailed(e.message)
             }
+
           processTransactionTuple <- 
             transactionsService
               .process(transaction)
@@ -155,14 +181,24 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
               .map { e =>
                 // fail transfer from hold
                 transactionsService.updateStatus(transaction.id, TransactionStatus.Failed)
-                // fail liquidation transfer
+                // fail liquidation transaction
                 transactionsService.releaseHold(liquidationTransaction)
                 transactionsService.updateStatus(liquidationTransaction.id, TransactionStatus.Failed)
-                InvestmentServiceInternalError(s"Failed to process transaction ${transaction.id}: ${e.message}")
+                ProcessTransactionFailed("Failed to process transaction ${transaction.id}: ${e.message}")
               }
-        } yield {
-          transactionsService.execute(processTransactionTuple)
-        }
+
+          _ <-
+            transactionsService
+              .execute(processTransactionTuple)
+              .fold(
+                error => {
+                  Left(ExecuteTransactionFailed(error.message))
+                },
+                _ => {
+                  Right(transactionsService.updateStatus(liquidationTransaction.id, TransactionStatus.Completed))
+                }
+              )
+        } yield ()
       })
   }
 }

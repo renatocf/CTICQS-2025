@@ -31,7 +31,7 @@ class TestUtils {
     id: String,
     customerId: String,
     walletType: WalletType,
-    policyId: String
+    policyId: Option[String] = None,
   ): Wallet = {
     val wallet = Wallet(
       id = id,

@@ -55,7 +55,7 @@ class TransactionsServiceTest extends AnyFlatSpec with BeforeAndAfterEach with M
       id = "realMoneyWalletId",
       customerId = customerId,
       walletType = WalletType.RealMoney,
-      policyId = investmentPolicy.id
+      policyId = Some(investmentPolicy.id)
     )
 
     utils.insertWalletInMemory(
@@ -63,7 +63,7 @@ class TransactionsServiceTest extends AnyFlatSpec with BeforeAndAfterEach with M
       id = "investmentWalletId",
       customerId = customerId,
       walletType = WalletType.Investment,
-      policyId = investmentPolicy.id
+      policyId = Some(investmentPolicy.id)
     )
 
     utils.insertWalletInMemory(
@@ -71,7 +71,6 @@ class TransactionsServiceTest extends AnyFlatSpec with BeforeAndAfterEach with M
       id = "emergencyFundsWalletId",
       customerId = customerId,
       walletType = WalletType.EmergencyFunds,
-      policyId = investmentPolicy.id
     )
   }
 

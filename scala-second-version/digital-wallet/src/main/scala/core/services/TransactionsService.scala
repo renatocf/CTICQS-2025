@@ -33,7 +33,7 @@ class TransactionsService(
     }
   }
 
-  def execute(tuple: ProcessTransactionTuple): Either[TransactionServiceError, Transaction] = {
+  def execute(tuple: ProcessTransactionTuple): Either[ExecutionError, Transaction] = {
     val (transaction, journalEntries, statusOnSuccess, maybeExecuteAction) = tuple
 
     val actionResult: Either[PartnerServiceError, Unit] = maybeExecuteAction match {
@@ -41,17 +41,17 @@ class TransactionsService(
       case None => Right(())
     }
 
-    val updateResult = actionResult match {
-      case Left(_) => transactionsRepo.update(transaction.id, TransactionStatus.TransientError)
+    actionResult match {
+      case Left(e) =>
+        updateStatus(transaction.id, TransactionStatus.TransientError)
+        Left(ExecutionError(e.message))
       case Right(_) =>
         ledgerService.postJournalEntries(journalEntries)
-        transactionsRepo.update(transaction.id, statusOnSuccess)
+        Right(updateStatus(transaction.id, statusOnSuccess))
     }
-
-    updateResult.left.map(e => ExecutionError(e.message))
   }
 
-  def updateStatus(transactionId: String, status: TransactionStatus): Unit = {
+  def updateStatus(transactionId: String, status: TransactionStatus): Transaction = {
     transactionsRepo.update(transactionId, status)
   }
 

@@ -47,21 +47,18 @@ class TransactionInMemoryDatabase extends TransactionDatabase {
       .toList
   }
 
-  override def update(transactionId: String, status: TransactionStatus, statusReason: Option[String], at: Option[LocalDateTime]): Either[TransactionDbError, Transaction] = {
-    for {
-      transaction <- transactions.get(transactionId).toRight(TransactionDbError(s"Transaction not found: $transactionId"))
-    } yield {
-      status match {
-        case TransactionStatus.Failed => transaction.failedAt = at
-        case TransactionStatus.Completed => transaction.completedAt = at
-        case _ =>
-      }
-
-      transaction.status = status
-      transaction.statusReason = statusReason
-
-      transaction
+  override def update(transactionId: String, status: TransactionStatus, statusReason: Option[String], at: Option[LocalDateTime]): Transaction = {
+    val transaction = transactions(transactionId)
+    status match {
+      case TransactionStatus.Failed => transaction.failedAt = at
+      case TransactionStatus.Completed => transaction.completedAt = at
+      case _ =>
     }
+
+    transaction.status = status
+    transaction.statusReason = statusReason
+
+    transaction
   }
 
   def clear(): Unit = {
