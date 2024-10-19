@@ -13,7 +13,8 @@ case class TransactionFilter(
   id: Option[String] = None,
   batchId: Option[String] = None,
   status: Option[TransactionStatus] = None,
-  subwalletType: Option[List[SubwalletType]] = None
+  subwalletType: Option[List[SubwalletType]] = None,
+  idempotencyKey: Option[String] = None,
 )
 
 trait TransactionDatabase {

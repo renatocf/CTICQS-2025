@@ -7,3 +7,4 @@ trait TransactionServiceError extends DigitalWalletError {
 case class ExecutionError(message: String) extends TransactionServiceError
 case class ProcessError(message: String) extends TransactionServiceError
 case class CreationError(message: String) extends TransactionServiceError
+case class TransactionServiceInternalError(message: String) extends TransactionServiceError

@@ -206,13 +206,15 @@ class TransactionsService(
   }
 
   def retryBatch(batchId: String): Either[TransactionServiceError, Unit] = {
-    transactionsRepo
+    val transactions = transactionsRepo
       .find(TransactionFilter(batchId = Some(batchId)))
       .filter(t => t.status == TransactionStatus.TransientError)
+
+    transactions
       .traverse { t =>
-        processTransaction(t).left.map { e =>
-          failBatch(batchId)
-          updateStatus(batchId, TransactionStatus.Failed)
+        process(t).left.map { e =>
+          // We are not really expecting a process error 
+          // as we know it worked for the first time
           ProcessError(e.message)
         }
       }
@@ -225,8 +227,15 @@ class TransactionsService(
         if (failures.nonEmpty) {
           Left(ExecutionError(s"Could not execute batch successfully."))
         } else {
-          updateStatus(batchId, TransactionStatus.Completed)
-          Right(())
+          for {
+            originatingTransaction <- 
+              transactionsRepo
+                .find(TransactionFilter(idempotencyKey = Some(batchId)))
+                .headOption
+                .toRight(TransactionServiceInternalError(s"Could not find transaction with idempotency key ${batchId}"))
+          } yield {
+            updateStatus(originatingTransaction.id, TransactionStatus.Completed)
+          }
         }
       })
   }

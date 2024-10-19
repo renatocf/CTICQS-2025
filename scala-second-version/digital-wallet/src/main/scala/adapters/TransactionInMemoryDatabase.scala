@@ -40,6 +40,7 @@ class TransactionInMemoryDatabase extends TransactionDatabase {
     transactions.values
       .filter { transaction =>
         (filter.id.forall(_ == transaction.id)) &&
+          (filter.idempotencyKey.forall(_ == transaction.idempotencyKey)) &&
           (filter.batchId.forall(transaction.batchId.contains(_))) &&
           (filter.status.forall(_ == transaction.status)) &&
           (filter.subwalletType.forall(types => types.contains(transaction.originatorSubwalletType)))
