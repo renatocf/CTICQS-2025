@@ -22,7 +22,6 @@ class Withdraw(
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: TransactionStatus,
-    statusReason: String? = null,
     metadata: TransactionMetadata? = null,
 ) : Transaction(
         id,
@@ -36,7 +35,6 @@ class Withdraw(
         completedAt,
         failedAt,
         status,
-        statusReason,
         metadata,
     ) {
     override fun validate(

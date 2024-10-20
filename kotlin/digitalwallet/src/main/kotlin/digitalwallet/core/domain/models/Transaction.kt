@@ -23,7 +23,6 @@ abstract class Transaction(
     var completedAt: LocalDateTime? = null,
     var failedAt: LocalDateTime? = null,
     var status: TransactionStatus,
-    var statusReason: String? = null,
     val metadata: TransactionMetadata? = null,
 ) {
     abstract fun validate(
@@ -54,21 +53,15 @@ abstract class Transaction(
     fun updateStatus(
         transactionsRepo: TransactionsDatabase,
         newStatus: TransactionStatus,
-        statusReason: String? = null,
         at: LocalDateTime? = LocalDateTime.now(),
     ) {
-        transactionsRepo.update(this.id, status = newStatus, statusReason = statusReason, at = at)
+        transactionsRepo.update(this.id, status = newStatus)
 
         if (newStatus == TransactionStatus.FAILED) {
             this.failedAt = at
         }
 
-        if (newStatus == TransactionStatus.COMPLETED) {
-            this.completedAt = at
-        }
-
         this.status = newStatus
-        this.statusReason = statusReason
     }
 
     abstract suspend fun process(

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:no-wildcard-imports")
+
 package digitalwallet
 
 import digitalwallet.adapters.InvestmentPolicyInMemoryDatabase
@@ -6,9 +8,11 @@ import digitalwallet.adapters.WalletsInMemoryDatabase
 import digitalwallet.core.domain.enums.*
 import digitalwallet.core.domain.models.CreateJournalEntry
 import digitalwallet.core.domain.models.ProcessTransactionRequest
+import digitalwallet.core.exceptions.*
 import digitalwallet.core.services.LedgerService
 import digitalwallet.core.services.PartnerService
 import digitalwallet.core.services.TransactionsService
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
@@ -133,9 +137,9 @@ class TransactionsServiceTest : DescribeSpec() {
                         type = TransactionType.DEPOSIT,
                     )
 
-                val transaction = transactionsService.processTransaction(request)
-
-                transaction.status shouldBe TransactionStatus.FAILED
+                shouldThrow<ExternalTransactionValidationException> {
+                    transactionsService.processTransaction(request)
+                }
 
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }
             }
@@ -187,9 +191,9 @@ class TransactionsServiceTest : DescribeSpec() {
                         type = TransactionType.WITHDRAW,
                     )
 
-                val transaction = transactionsService.processTransaction(request)
-
-                transaction.status shouldBe TransactionStatus.FAILED
+                shouldThrow<ExternalTransactionValidationException> {
+                    transactionsService.processTransaction(request)
+                }
 
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }
             }
@@ -208,9 +212,9 @@ class TransactionsServiceTest : DescribeSpec() {
                         type = TransactionType.WITHDRAW,
                     )
 
-                val transaction = transactionsService.processTransaction(request)
-
-                transaction.status shouldBe TransactionStatus.FAILED
+                shouldThrow<InsufficientFundsException> {
+                    transactionsService.processTransaction(request)
+                }
 
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }
             }
@@ -262,11 +266,9 @@ class TransactionsServiceTest : DescribeSpec() {
                         type = TransactionType.HOLD,
                     )
 
-                val transaction = transactionsService.processTransaction(request)
-
-                // we cannot test if it actually failed because of this, unless
-                // we inspect the message...
-                transaction.status shouldBe TransactionStatus.FAILED
+                shouldThrow<HoldNotAllowed> {
+                    transactionsService.processTransaction(request)
+                }
 
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }
             }
@@ -285,9 +287,9 @@ class TransactionsServiceTest : DescribeSpec() {
                         type = TransactionType.HOLD,
                     )
 
-                val transaction = transactionsService.processTransaction(request)
-
-                transaction.status shouldBe TransactionStatus.FAILED
+                shouldThrow<InsufficientFundsException> {
+                    transactionsService.processTransaction(request)
+                }
 
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }
             }
@@ -344,9 +346,9 @@ class TransactionsServiceTest : DescribeSpec() {
                         type = TransactionType.TRANSFER,
                     )
 
-                val transaction = transactionsService.processTransaction(request)
-
-                transaction.status shouldBe TransactionStatus.FAILED
+                shouldThrow<TransferNotAllowed> {
+                    transactionsService.processTransaction(request)
+                }
 
                 coVerify(exactly = 0) { partnerServiceMock.executeInternalTransfer(any()) }
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }
@@ -368,9 +370,9 @@ class TransactionsServiceTest : DescribeSpec() {
                         type = TransactionType.TRANSFER,
                     )
 
-                val transaction = transactionsService.processTransaction(request)
-
-                transaction.status shouldBe TransactionStatus.FAILED
+                shouldThrow<InsufficientFundsException> {
+                    transactionsService.processTransaction(request)
+                }
 
                 coVerify(exactly = 0) { partnerServiceMock.executeInternalTransfer(any()) }
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }
@@ -446,9 +448,7 @@ class TransactionsServiceTest : DescribeSpec() {
                         type = TransactionType.TRANSFER_FROM_HOLD,
                     )
 
-                val transaction = transactionsService.processTransaction(request)
-
-                transaction.status shouldBe TransactionStatus.FAILED
+                shouldThrow<TransferFromHoldNotAllowed> { transactionsService.processTransaction(request) }
 
                 coVerify(exactly = 0) { partnerServiceMock.executeInternalTransfer(any()) }
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }
@@ -479,9 +479,9 @@ class TransactionsServiceTest : DescribeSpec() {
                         type = TransactionType.TRANSFER_FROM_HOLD,
                     )
 
-                val transaction = transactionsService.processTransaction(request)
-
-                transaction.status shouldBe TransactionStatus.FAILED
+                shouldThrow<InsufficientFundsException> {
+                    transactionsService.processTransaction(request)
+                }
 
                 coVerify(exactly = 0) { partnerServiceMock.executeInternalTransfer(any()) }
                 coVerify(exactly = 0) { ledgerServiceMock.postJournalEntries(any()) }

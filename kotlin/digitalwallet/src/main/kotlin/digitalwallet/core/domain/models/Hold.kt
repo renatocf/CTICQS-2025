@@ -23,7 +23,6 @@ class Hold(
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: TransactionStatus,
-    statusReason: String? = null,
     metadata: TransactionMetadata? = null,
 ) : Transaction(
         id,
@@ -37,7 +36,6 @@ class Hold(
         completedAt,
         failedAt,
         status,
-        statusReason,
         metadata,
     ) {
     override fun validate(

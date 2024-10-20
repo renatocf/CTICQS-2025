@@ -7,6 +7,8 @@ import digitalwallet.core.domain.enums.TransactionStatus
 import digitalwallet.core.domain.enums.TransactionType
 import digitalwallet.core.domain.enums.WalletType
 import digitalwallet.core.domain.models.*
+import digitalwallet.core.exceptions.InsufficientFundsException
+import digitalwallet.core.exceptions.PartnerException
 import digitalwallet.core.exceptions.TransactionFailed
 import digitalwallet.core.services.*
 import io.kotest.assertions.throwables.shouldThrow
@@ -120,7 +122,7 @@ class WalletsServiceTest : DescribeSpec() {
                 }
             }
 
-            it("fails if transaction status is not processing") {
+            it("fail transaction if validation failed") {
                 val hold =
                     Hold(
                         id = "transactionId",
@@ -132,9 +134,24 @@ class WalletsServiceTest : DescribeSpec() {
                         insertedAt = LocalDateTime.now(),
                     )
 
+                val failedHold =
+                    Hold(
+                        id = hold.id,
+                        amount = hold.amount,
+                        idempotencyKey = hold.idempotencyKey,
+                        originatorWalletId = hold.originatorWalletId,
+                        originatorSubwalletType = hold.originatorSubwalletType,
+                        status = TransactionStatus.FAILED,
+                        insertedAt = hold.insertedAt,
+                    )
+
                 coEvery {
                     transactionsService.processTransaction(any())
-                } returns hold
+                } throws InsufficientFundsException("message")
+
+                coEvery {
+                    transactionsService.handleException(any(), any(), any())
+                } returns failedHold
 
                 val request =
                     InvestmentRequest(
@@ -159,6 +176,76 @@ class WalletsServiceTest : DescribeSpec() {
                             ),
                     )
                 }
+
+                coVerify(exactly = 1) {
+                    transactionsService.handleException(
+                        any(),
+                        TransactionStatus.FAILED,
+                        hold.idempotencyKey,
+                    )
+                }
+            }
+
+            it("fail transaction if call to partner failed") {
+                val hold =
+                    Hold(
+                        id = "transactionId",
+                        amount = BigDecimal(100),
+                        idempotencyKey = "idempotencyKey",
+                        originatorWalletId = "realMoneyWalletId",
+                        originatorSubwalletType = SubwalletType.REAL_MONEY,
+                        status = TransactionStatus.FAILED,
+                        insertedAt = LocalDateTime.now(),
+                    )
+
+                val failedHold =
+                    Hold(
+                        id = hold.id,
+                        amount = hold.amount,
+                        idempotencyKey = hold.idempotencyKey,
+                        originatorWalletId = hold.originatorWalletId,
+                        originatorSubwalletType = hold.originatorSubwalletType,
+                        status = TransactionStatus.FAILED,
+                        insertedAt = hold.insertedAt,
+                    )
+
+                coEvery {
+                    transactionsService.processTransaction(any())
+                } throws PartnerException("message")
+
+                coEvery {
+                    transactionsService.handleException(any(), any(), any())
+                } returns failedHold
+
+                val request =
+                    InvestmentRequest(
+                        customerId = "cust_123",
+                        amount = BigDecimal(100),
+                        idempotencyKey = "idempotencyKey",
+                    )
+
+                walletsService.invest(request)
+
+                coVerify(exactly = 1) {
+                    transactionsService.processTransaction(
+                        request =
+                            ProcessTransactionRequest(
+                                amount = BigDecimal(100),
+                                idempotencyKey = "idempotencyKey",
+                                originatorWalletId = "realMoneyWalletId",
+                                originatorSubwalletType = SubwalletType.REAL_MONEY,
+                                type = TransactionType.HOLD,
+                            ),
+                    )
+                }
+
+                coVerify(exactly = 1) {
+                    transactionsService.handleException(
+                        any(),
+                        TransactionStatus.TRANSIENT_ERROR,
+                        hold.idempotencyKey,
+                    )
+                }
             }
         }
 
@@ -172,18 +259,19 @@ class WalletsServiceTest : DescribeSpec() {
                     )
 
                 coEvery {
-                    investmentService.holdWithPolicy(any())
+                    investmentService.executeMovementWithInvestmentPolicy(any())
                 } returns Unit
 
                 walletsService.liquidate(request)
 
                 coVerify(exactly = 1) {
-                    investmentService.holdWithPolicy(
+                    investmentService.executeMovementWithInvestmentPolicy(
                         request =
                             InvestmentMovementRequest(
                                 amount = BigDecimal(100),
                                 idempotencyKey = "idempotencyKey",
                                 walletId = "investmentWalletId",
+                                transactionType = TransactionType.HOLD,
                                 investmentPolicy =
                                     InvestmentPolicy(
                                         id = "policyId",
@@ -209,7 +297,7 @@ class WalletsServiceTest : DescribeSpec() {
                     )
 
                 coEvery {
-                    investmentService.holdWithPolicy(any())
+                    investmentService.executeMovementWithInvestmentPolicy(any())
                 } throws TransactionFailed("")
 
                 shouldThrow<LiquidationFailed> {
@@ -217,12 +305,13 @@ class WalletsServiceTest : DescribeSpec() {
                 }
 
                 coVerify(exactly = 1) {
-                    investmentService.holdWithPolicy(
+                    investmentService.executeMovementWithInvestmentPolicy(
                         request =
                             InvestmentMovementRequest(
                                 amount = BigDecimal(100),
                                 idempotencyKey = "idempotencyKey",
                                 walletId = "investmentWalletId",
+                                transactionType = TransactionType.HOLD,
                                 investmentPolicy =
                                     InvestmentPolicy(
                                         id = "policyId",

@@ -7,7 +7,9 @@ import digitalwallet.core.domain.enums.WalletType
 import digitalwallet.core.domain.models.InvestmentRequest
 import digitalwallet.core.domain.models.LiquidationRequest
 import digitalwallet.core.domain.models.ProcessTransactionRequest
+import digitalwallet.core.exceptions.PartnerException
 import digitalwallet.core.exceptions.TransactionFailed
+import digitalwallet.core.exceptions.ValidationException
 import digitalwallet.ports.InvestmentPolicyDatabase
 import digitalwallet.ports.WalletFilter
 import digitalwallet.ports.WalletsDatabase
@@ -45,10 +47,14 @@ class WalletsService(
                 type = TransactionType.HOLD,
             )
 
-        val transaction = transactionsService.processTransaction(processTransactionRequest)
-
-        if (transaction.status != TransactionStatus.PROCESSING) {
-            throw InvestmentFailed("Failed to process investment ${request.idempotencyKey}")
+        try {
+            transactionsService.processTransaction(processTransactionRequest)
+        } catch (e: ValidationException) {
+            println(e)
+            transactionsService.handleException(e, TransactionStatus.FAILED, request.idempotencyKey)
+            throw InvestmentFailed(e.message.toString())
+        } catch (e: PartnerException) {
+            transactionsService.handleException(e, TransactionStatus.TRANSIENT_ERROR, request.idempotencyKey)
         }
     }
 
@@ -65,12 +71,13 @@ class WalletsService(
             investmentPolicyRepo.findById(wallet.policyId) ?: throw NoSuchElementException("Policy ${wallet.policyId} not found")
 
         try {
-            investmentService.holdWithPolicy(
+            investmentService.executeMovementWithInvestmentPolicy(
                 InvestmentMovementRequest(
                     amount = request.amount,
                     idempotencyKey = request.idempotencyKey,
                     walletId = wallet.id,
                     investmentPolicy = investmentPolicy,
+                    transactionType = TransactionType.HOLD,
                 ),
             )
         } catch (e: TransactionFailed) {

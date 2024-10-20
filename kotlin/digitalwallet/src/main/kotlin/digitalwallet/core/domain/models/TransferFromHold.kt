@@ -24,7 +24,6 @@ class TransferFromHold(
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: TransactionStatus,
-    statusReason: String? = null,
     metadata: TransactionMetadata? = null,
     private val beneficiaryWalletId: String,
     private val beneficiarySubwalletType: SubwalletType,
@@ -40,7 +39,6 @@ class TransferFromHold(
         completedAt,
         failedAt,
         status,
-        statusReason,
         metadata,
     ) {
     override fun validate(

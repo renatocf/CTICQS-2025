@@ -42,6 +42,7 @@ class TransactionsInMemoryDatabase : TransactionsDatabase {
         transactions.values
             .filter { transaction ->
                 (filter.id?.let { it == transaction.id } ?: true) &&
+                    (filter.idempotencyKey?.let { it == transaction.idempotencyKey } ?: true) &&
                     (filter.batchId?.let { it == transaction.batchId } ?: true) &&
                     (filter.status?.let { it == transaction.status } ?: true) &&
                     (filter.subwalletType?.let { transaction.originatorSubwalletType in it } ?: true)
@@ -50,7 +51,6 @@ class TransactionsInMemoryDatabase : TransactionsDatabase {
     override fun update(
         transactionId: String,
         status: TransactionStatus,
-        statusReason: String?,
         at: LocalDateTime?,
     ) {
         val transaction = transactions[transactionId] ?: throw TransactionNotFound("Transaction $transactionId not found.")
@@ -64,7 +64,6 @@ class TransactionsInMemoryDatabase : TransactionsDatabase {
         }
 
         transaction.status = status
-        transaction.statusReason = statusReason
     }
 
     fun clear() {
