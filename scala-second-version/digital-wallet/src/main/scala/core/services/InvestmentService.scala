@@ -169,7 +169,7 @@ class InvestmentService(transactionsRepo: TransactionDatabase, walletsRepo: Wall
           transaction <- transactionsService.create(
               CreateTransactionRequest(
                 amount = liquidationTransaction.amount,
-                idempotencyKey = s"${liquidationTransaction.idempotencyKey}_liquidation",
+                idempotencyKey = liquidationTransaction.id,
                 originatorWalletId = liquidationTransaction.originatorWalletId,
                 originatorSubwalletType = liquidationTransaction.originatorSubwalletType,
                 beneficiaryWalletId = Some(realMoneyWallet.id),

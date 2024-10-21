@@ -21,7 +21,6 @@ data class Transaction(
     var failedAt: LocalDateTime? = null,
     var status: digitalwallet.core.domain.enums.TransactionStatus,
     var statusReason: String? = null,
-    val metadata: TransactionMetadata?,
 ) {
     fun toModel(): TransactionModel =
         when (this.type) {
@@ -36,7 +35,6 @@ data class Transaction(
                     insertedAt = this.insertedAt,
                     failedAt = this.failedAt,
                     status = this.status,
-                    metadata = this.metadata,
                 )
             digitalwallet.core.domain.enums.TransactionType.WITHDRAW ->
                 Withdraw(
@@ -49,7 +47,6 @@ data class Transaction(
                     insertedAt = this.insertedAt,
                     failedAt = this.failedAt,
                     status = this.status,
-                    metadata = this.metadata,
                 )
             digitalwallet.core.domain.enums.TransactionType.HOLD ->
                 Hold(
@@ -62,7 +59,6 @@ data class Transaction(
                     insertedAt = this.insertedAt,
                     failedAt = this.failedAt,
                     status = this.status,
-                    metadata = this.metadata,
                 )
             digitalwallet.core.domain.enums.TransactionType.TRANSFER ->
                 Transfer(
@@ -77,7 +73,6 @@ data class Transaction(
                     insertedAt = this.insertedAt,
                     failedAt = this.failedAt,
                     status = this.status,
-                    metadata = this.metadata,
                 )
             digitalwallet.core.domain.enums.TransactionType.TRANSFER_FROM_HOLD ->
                 TransferFromHold(
@@ -92,7 +87,6 @@ data class Transaction(
                     insertedAt = this.insertedAt,
                     failedAt = this.failedAt,
                     status = this.status,
-                    metadata = this.metadata,
                 )
         }
 }

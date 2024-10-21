@@ -23,7 +23,6 @@ class Hold(
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: TransactionStatus,
-    metadata: TransactionMetadata? = null,
 ) : Transaction(
         id,
         batchId,
@@ -36,7 +35,6 @@ class Hold(
         completedAt,
         failedAt,
         status,
-        metadata,
     ) {
     override fun validate(
         walletsRepo: WalletsDatabase,

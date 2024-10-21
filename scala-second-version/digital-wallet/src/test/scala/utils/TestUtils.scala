@@ -72,7 +72,6 @@ class TestUtils {
    transactionType: TransactionType = TransactionType.Deposit,
    insertedAt: LocalDateTime = LocalDateTime.now(),
    status: TransactionStatus = TransactionStatus.Processing,
-   metadata: Option[TransactionMetadata] = None
  ): Transaction = {
     val transaction = Transaction(
       id = id,
@@ -86,7 +85,6 @@ class TestUtils {
       transactionType = transactionType,
       insertedAt = insertedAt,
       status = status,
-      metadata = metadata
     )
 
     db.transactions(id) = transaction

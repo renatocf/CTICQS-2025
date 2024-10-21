@@ -1712,7 +1712,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
       beneficiaryWalletId = Some("realMoneyWalletId"),
       beneficiarySubwalletType = Some(SubwalletType.RealMoney),
       amount = BigDecimal("50.0"),
-      idempotencyKey = "idempotencyKey1_liquidation",
+      idempotencyKey = firstLiquidationTransaction.id,
       insertedAt = LocalDateTime.now(),
       status = TransactionStatus.Creating
     )
@@ -1757,7 +1757,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
       beneficiaryWalletId = Some("realMoneyWalletId2"),
       beneficiarySubwalletType = Some(SubwalletType.RealMoney),
       amount = BigDecimal("100.0"),
-      idempotencyKey = "idempotencyKey2_liquidation",
+      idempotencyKey = secondLiquidationTransaction.id,
       insertedAt = LocalDateTime.now(),
       status = TransactionStatus.Creating
     )
@@ -1795,8 +1795,8 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
     when(transactionsServiceMock.create(any[CreateTransactionRequest])).thenAnswer { invocation =>
       val request: CreateTransactionRequest = invocation.getArgument(0)
       request.idempotencyKey match {
-        case "idempotencyKey1_liquidation" => Right(firstTransaction)
-        case "idempotencyKey2_liquidation" => Right(secondTransaction)
+        case firstLiquidationTransaction.id => Right(firstTransaction)
+        case secondLiquidationTransaction.id  => Right(secondTransaction)
       }
     }
 
@@ -1823,7 +1823,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
     verify(transactionsServiceMock)
       .create(ArgumentMatchers.eq(CreateTransactionRequest(
         amount = BigDecimal("50.0"),
-        idempotencyKey = "idempotencyKey1_liquidation",
+        idempotencyKey = firstLiquidationTransaction.id,
         originatorWalletId = "investmentWalletId",
         originatorSubwalletType = SubwalletType.Stock,
         beneficiaryWalletId = Some("realMoneyWalletId"),
@@ -1841,7 +1841,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
     verify(transactionsServiceMock)
       .create(ArgumentMatchers.eq(CreateTransactionRequest(
         amount = BigDecimal("100.0"),
-        idempotencyKey = "idempotencyKey2_liquidation",
+        idempotencyKey = secondLiquidationTransaction.id,
         originatorWalletId = "investmentWalletId2",
         originatorSubwalletType = SubwalletType.Cryptocurrency,
         beneficiaryWalletId = Some("realMoneyWalletId2"),
@@ -1892,7 +1892,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
       beneficiaryWalletId = Some("realMoneyWalletId"),
       beneficiarySubwalletType = Some(SubwalletType.RealMoney),
       amount = BigDecimal("50.0"),
-      idempotencyKey = "idempotencyKey1_liquidation",
+      idempotencyKey = firstLiquidationTransaction.id,
       insertedAt = LocalDateTime.now(),
       status = TransactionStatus.Creating
     )
@@ -1937,7 +1937,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
       beneficiaryWalletId = Some("realMoneyWalletId2"),
       beneficiarySubwalletType = Some(SubwalletType.RealMoney),
       amount = BigDecimal("100.0"),
-      idempotencyKey = "idempotencyKey2_liquidation",
+      idempotencyKey = secondLiquidationTransaction.id,
       insertedAt = LocalDateTime.now(),
       status = TransactionStatus.Creating
     )
@@ -1945,8 +1945,8 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
     when(transactionsServiceMock.create(any[CreateTransactionRequest])).thenAnswer { invocation =>
       val request: CreateTransactionRequest = invocation.getArgument(0)
       request.idempotencyKey match {
-        case "idempotencyKey1_liquidation" => Right(firstTransaction)
-        case "idempotencyKey2_liquidation" => Right(secondTransaction)
+        case firstLiquidationTransaction.id => Right(firstTransaction)
+        case secondLiquidationTransaction => Right(secondTransaction)
       }
     }
 
@@ -1972,7 +1972,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
     verify(transactionsServiceMock)
       .create(ArgumentMatchers.eq(CreateTransactionRequest(
         amount = BigDecimal("50.0"),
-        idempotencyKey = "idempotencyKey1_liquidation",
+        idempotencyKey = firstLiquidationTransaction.id,
         originatorWalletId = "investmentWalletId",
         originatorSubwalletType = SubwalletType.Stock,
         beneficiaryWalletId = Some("realMoneyWalletId"),
@@ -1990,7 +1990,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
     verify(transactionsServiceMock)
       .create(ArgumentMatchers.eq(CreateTransactionRequest(
         amount = BigDecimal("100.0"),
-        idempotencyKey = "idempotencyKey2_liquidation",
+        idempotencyKey = secondLiquidationTransaction.id,
         originatorWalletId = "investmentWalletId2",
         originatorSubwalletType = SubwalletType.Cryptocurrency,
         beneficiaryWalletId = Some("realMoneyWalletId2"),
@@ -2043,7 +2043,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
       beneficiaryWalletId = Some("realMoneyWalletId"),
       beneficiarySubwalletType = Some(SubwalletType.RealMoney),
       amount = BigDecimal("50.0"),
-      idempotencyKey = "idempotencyKey1_liquidation",
+      idempotencyKey = firstLiquidationTransaction.id,
       insertedAt = LocalDateTime.now(),
       status = TransactionStatus.Creating
     )
@@ -2088,7 +2088,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
       beneficiaryWalletId = Some("realMoneyWalletId2"),
       beneficiarySubwalletType = Some(SubwalletType.RealMoney),
       amount = BigDecimal("100.0"),
-      idempotencyKey = "idempotencyKey2_liquidation",
+      idempotencyKey = secondLiquidationTransaction.id,
       insertedAt = LocalDateTime.now(),
       status = TransactionStatus.Creating
     )
@@ -2126,8 +2126,8 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
     when(transactionsServiceMock.create(any[CreateTransactionRequest])).thenAnswer { invocation =>
       val request: CreateTransactionRequest = invocation.getArgument(0)
       request.idempotencyKey match {
-        case "idempotencyKey1_liquidation" => Right(firstTransaction)
-        case "idempotencyKey2_liquidation" => Right(secondTransaction)
+        case firstLiquidationTransaction.id => Right(firstTransaction)
+        case secondLiquidationTransaction.id => Right(secondTransaction)
       }
     }
 
@@ -2154,7 +2154,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
     verify(transactionsServiceMock)
       .create(ArgumentMatchers.eq(CreateTransactionRequest(
         amount = BigDecimal("50.0"),
-        idempotencyKey = "idempotencyKey1_liquidation",
+        idempotencyKey = firstLiquidationTransaction.id,
         originatorWalletId = "investmentWalletId",
         originatorSubwalletType = SubwalletType.Stock,
         beneficiaryWalletId = Some("realMoneyWalletId"),
@@ -2172,7 +2172,7 @@ class InvestmentServiceTest  extends AnyFlatSpec with BeforeAndAfterEach with Ma
     verify(transactionsServiceMock)
       .create(ArgumentMatchers.eq(CreateTransactionRequest(
         amount = BigDecimal("100.0"),
-        idempotencyKey = "idempotencyKey2_liquidation",
+        idempotencyKey = secondLiquidationTransaction.id,
         originatorWalletId = "investmentWalletId2",
         originatorSubwalletType = SubwalletType.Cryptocurrency,
         beneficiaryWalletId = Some("realMoneyWalletId2"),

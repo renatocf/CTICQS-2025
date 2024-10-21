@@ -21,5 +21,4 @@ case class Transaction(
     var failedAt: Option[LocalDateTime] = None,
     var status: TransactionStatus,
     var statusReason: Option[String] = None,
-    metadata: Option[TransactionMetadata] = None
 )

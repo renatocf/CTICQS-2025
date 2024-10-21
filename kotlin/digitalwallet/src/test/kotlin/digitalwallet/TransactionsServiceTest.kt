@@ -12,6 +12,7 @@ import digitalwallet.core.exceptions.*
 import digitalwallet.core.services.LedgerService
 import digitalwallet.core.services.PartnerService
 import digitalwallet.core.services.TransactionsService
+import digitalwallet.ports.TransactionFilter
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
@@ -22,6 +23,7 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import java.math.BigDecimal
 import java.time.LocalDateTime
+import java.util.*
 
 @MicronautTest
 class TransactionsServiceTest : DescribeSpec() {
@@ -561,6 +563,131 @@ class TransactionsServiceTest : DescribeSpec() {
                             ),
                     )
                 }
+            }
+        }
+
+        describe("retryBatch") {
+            it("works") {
+                val batchId = "batchId"
+
+                val originatingTransaction =
+                    insertTransactionInMemory(
+                        transactionsDatabaseInMemory,
+                        id = UUID.randomUUID().toString(),
+                        idempotencyKey = batchId,
+                        type = TransactionType.HOLD,
+                        originatorSubwalletType = SubwalletType.REAL_MONEY,
+                        amount = BigDecimal(300),
+                        originatorWalletId = "realMoneyWalletId",
+                        insertedAt = LocalDateTime.now(),
+                        status = TransactionStatus.PROCESSING,
+                    )
+
+                val firstTransaction =
+                    insertTransactionInMemory(
+                        db = transactionsDatabaseInMemory,
+                        id = UUID.randomUUID().toString(),
+                        batchId = batchId,
+                        idempotencyKey = "${batchId}_Stock",
+                        type = TransactionType.TRANSFER_FROM_HOLD,
+                        originatorSubwalletType = SubwalletType.REAL_MONEY,
+                        amount = BigDecimal(100),
+                        originatorWalletId = "realMoneyWalletId",
+                        beneficiarySubwalletType = SubwalletType.STOCK,
+                        beneficiaryWalletId = "investmentWalletId",
+                        insertedAt = LocalDateTime.now(),
+                        status = TransactionStatus.TRANSIENT_ERROR,
+                    )
+
+                val journalEntries1 =
+                    listOf(
+                        CreateJournalEntry(
+                            walletId = "realMoneyWalletId",
+                            subwalletType = SubwalletType.REAL_MONEY,
+                            balanceType = BalanceType.HOLDING,
+                            amount = -BigDecimal(100),
+                        ),
+                        CreateJournalEntry(
+                            walletId = "investmentWalletId",
+                            subwalletType = SubwalletType.STOCK,
+                            balanceType = BalanceType.AVAILABLE,
+                            amount = BigDecimal(100),
+                        ),
+                    )
+
+                insertTransactionInMemory(
+                    db = transactionsDatabaseInMemory,
+                    id = UUID.randomUUID().toString(),
+                    batchId = batchId,
+                    idempotencyKey = "${batchId}_RealEstate",
+                    type = TransactionType.TRANSFER_FROM_HOLD,
+                    originatorSubwalletType = SubwalletType.REAL_MONEY,
+                    amount = BigDecimal(100),
+                    originatorWalletId = "realMoneyWalletId",
+                    beneficiarySubwalletType = SubwalletType.REAL_ESTATE,
+                    beneficiaryWalletId = "investmentWalletId",
+                    insertedAt = LocalDateTime.now(),
+                    status = TransactionStatus.COMPLETED,
+                )
+
+                val thirdTransaction =
+                    insertTransactionInMemory(
+                        db = transactionsDatabaseInMemory,
+                        id = UUID.randomUUID().toString(),
+                        batchId = batchId,
+                        idempotencyKey = "${batchId}_Cryptocurrency",
+                        type = TransactionType.TRANSFER_FROM_HOLD,
+                        originatorSubwalletType = SubwalletType.REAL_MONEY,
+                        amount = BigDecimal(100),
+                        originatorWalletId = "realMoneyWalletId",
+                        beneficiarySubwalletType = SubwalletType.CRYPTOCURRENCY,
+                        beneficiaryWalletId = "investmentWalletId",
+                        insertedAt = LocalDateTime.now(),
+                        status = TransactionStatus.TRANSIENT_ERROR,
+                    )
+
+                val journalEntries3 =
+                    listOf(
+                        CreateJournalEntry(
+                            walletId = "realMoneyWalletId",
+                            subwalletType = SubwalletType.REAL_MONEY,
+                            balanceType = BalanceType.HOLDING,
+                            amount = -BigDecimal(100),
+                        ),
+                        CreateJournalEntry(
+                            walletId = "investmentWalletId",
+                            subwalletType = SubwalletType.CRYPTOCURRENCY,
+                            balanceType = BalanceType.AVAILABLE,
+                            amount = BigDecimal(100),
+                        ),
+                    )
+
+                coEvery {
+                    partnerServiceMock.executeInternalTransfer(any())
+                } returns Unit
+
+                coEvery {
+                    ledgerServiceMock.postJournalEntries(any())
+                } returns LocalDateTime.now()
+
+                transactionsService.retryBatch(batchId, 3)
+
+                coVerify(exactly = 2) {
+                    partnerServiceMock.executeInternalTransfer(any())
+                }
+
+                coVerify {
+                    ledgerServiceMock.postJournalEntries(journalEntries1)
+                    ledgerServiceMock.postJournalEntries(journalEntries3)
+                }
+
+                val firstTransactionCompleted = transactionsDatabaseInMemory.find(TransactionFilter(id = firstTransaction.id))
+                val thirdTransactionCompleted = transactionsDatabaseInMemory.find(TransactionFilter(id = thirdTransaction.id))
+                val originatingTransactionCompleted = transactionsDatabaseInMemory.find(TransactionFilter(id = originatingTransaction.id))
+
+                firstTransactionCompleted.first().status shouldBe TransactionStatus.COMPLETED
+                thirdTransactionCompleted.first().status shouldBe TransactionStatus.COMPLETED
+                originatingTransactionCompleted.first().status shouldBe TransactionStatus.COMPLETED
             }
         }
     }

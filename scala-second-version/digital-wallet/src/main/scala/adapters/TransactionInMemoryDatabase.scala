@@ -29,7 +29,6 @@ class TransactionInMemoryDatabase extends TransactionDatabase {
       transactionType = request.transactionType,
       insertedAt = LocalDateTime.now(),
       status = TransactionStatus.Processing,
-      metadata = request.metadata
     )
 
     transactions(id) = transaction

@@ -31,7 +31,6 @@ class TransactionsInMemoryDatabase : TransactionsDatabase {
                 type = request.type,
                 insertedAt = LocalDateTime.now(),
                 status = TransactionStatus.PROCESSING,
-                metadata = request.metadata,
             )
 
         transactions[id] = transaction

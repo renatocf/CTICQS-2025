@@ -23,7 +23,6 @@ abstract class Transaction(
     var completedAt: LocalDateTime? = null,
     var failedAt: LocalDateTime? = null,
     var status: TransactionStatus,
-    val metadata: TransactionMetadata? = null,
 ) {
     abstract fun validate(
         walletsRepo: WalletsDatabase,

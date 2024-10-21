@@ -206,15 +206,12 @@ class TransactionsService(
   }
 
   def retryBatch(batchId: String): Either[TransactionServiceError, Unit] = {
-    val transactions = transactionsRepo
-      .find(TransactionFilter(batchId = Some(batchId)))
-      .filter(t => t.status == TransactionStatus.TransientError)
-
-    transactions
+    transactionsRepo
+      .find(TransactionFilter(batchId = Some(batchId), status = Some(TransactionStatus.TransientError)))
       .traverse { t =>
         process(t).left.map { e =>
           // We are not really expecting a process error 
-          // as we know it worked for the first time
+          // as we know it worked the first time
           ProcessError(e.message)
         }
       }
@@ -226,7 +223,8 @@ class TransactionsService(
 
         if (failures.nonEmpty) {
           Left(ExecutionError(s"Could not execute batch successfully."))
-        } else {
+        } 
+        else {
           for {
             originatingTransaction <- 
               transactionsRepo

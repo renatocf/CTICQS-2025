@@ -4,6 +4,7 @@ import digitalwallet.adapters.Logger
 import digitalwallet.core.domain.enums.TransactionStatus
 import digitalwallet.core.domain.models.ProcessTransactionRequest
 import digitalwallet.core.domain.models.Transaction
+import digitalwallet.core.exceptions.PartnerException
 import digitalwallet.ports.TransactionFilter
 import digitalwallet.ports.TransactionsDatabase
 import digitalwallet.ports.WalletsDatabase
@@ -38,6 +39,39 @@ class TransactionsService(
         transaction?.updateStatus(transactionsRepo, status)
 
         return transaction
+    }
+
+    suspend fun retryBatch(
+        batchId: String,
+        n: Int,
+    ) {
+        val transactions = transactionsRepo.find(TransactionFilter(batchId = batchId, status = TransactionStatus.TRANSIENT_ERROR))
+        var allCompleted = true
+
+        for (transaction in transactions) {
+            var attempts = 0
+            var success = false
+
+            while (attempts < n && !success) {
+                attempts++
+                try {
+                    transaction.process(transactionsRepo, ledgerService, partnerService)
+                    transaction.updateStatus(transactionsRepo, TransactionStatus.COMPLETED)
+                    success = true
+                } catch (e: PartnerException) {
+                    break
+                }
+            }
+
+            if (!success) {
+                allCompleted = false
+            }
+        }
+
+        if (allCompleted) {
+            val originalTransaction = transactionsRepo.find(TransactionFilter(idempotencyKey = batchId)).firstOrNull()
+            originalTransaction?.updateStatus(transactionsRepo, TransactionStatus.COMPLETED)
+        }
     }
 
     fun reverseAndFailTransactionsBatch(batchId: String) {

@@ -22,7 +22,6 @@ class Withdraw(
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: TransactionStatus,
-    metadata: TransactionMetadata? = null,
 ) : Transaction(
         id,
         batchId,
@@ -35,7 +34,6 @@ class Withdraw(
         completedAt,
         failedAt,
         status,
-        metadata,
     ) {
     override fun validate(
         walletsRepo: WalletsDatabase,

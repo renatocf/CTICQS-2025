@@ -11,7 +11,6 @@ import digitalwallet.core.domain.enums.SubwalletType
 import digitalwallet.core.domain.enums.TransactionStatus
 import digitalwallet.core.domain.enums.TransactionType
 import digitalwallet.core.domain.enums.WalletType
-import digitalwallet.core.domain.models.TransactionMetadata
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.UUID
@@ -78,7 +77,6 @@ fun insertTransactionInMemory(
     type: TransactionType = TransactionType.DEPOSIT,
     insertedAt: LocalDateTime = LocalDateTime.now(),
     status: TransactionStatus = TransactionStatus.PROCESSING,
-    metadata: TransactionMetadata? = null,
 ): Transaction {
     val transaction =
         Transaction(
@@ -93,7 +91,6 @@ fun insertTransactionInMemory(
             type = type,
             insertedAt = insertedAt,
             status = status,
-            metadata = metadata,
         )
 
     db.transactions[id] = transaction

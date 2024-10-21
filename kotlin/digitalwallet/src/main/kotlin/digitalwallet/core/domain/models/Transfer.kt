@@ -23,7 +23,6 @@ class Transfer(
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: TransactionStatus,
-    metadata: TransactionMetadata? = null,
     val beneficiaryWalletId: String,
     val beneficiarySubwalletType: SubwalletType,
 ) : Transaction(
@@ -38,7 +37,6 @@ class Transfer(
         completedAt,
         failedAt,
         status,
-        metadata,
     ) {
     override fun validate(
         walletsRepo: WalletsDatabase,

@@ -99,40 +99,6 @@ class InvestmentService(
         )
     }
 
-//    private suspend fun transferWithPolicy(
-//        request: InvestmentMovementRequest,
-//        originatorSubwalletType: SubwalletType,
-//    ) {
-//        for ((subwalletType, percentage) in request.investmentPolicy.allocationStrategy) {
-//            if (percentage > BigDecimal(0)) {
-//                val processTransactionRequest =
-//                    ProcessTransactionRequest(
-//                        amount = request.amount.multiply(percentage),
-//                        batchId = request.idempotencyKey,
-//                        idempotencyKey = "${request.idempotencyKey}_$subwalletType",
-//                        originatorWalletId = request.walletId,
-//                        originatorSubwalletType = originatorSubwalletType,
-//                        beneficiaryWalletId = request.targetWalletId,
-//                        beneficiarySubwalletType = subwalletType,
-//                        type = TransactionType.TRANSFER_FROM_HOLD,
-//                    )
-//
-//                try {
-//                    transactionsService.processTransaction(processTransactionRequest)
-//                } catch (e: ValidationException) {
-//                    transactionsService.handleException(e, TransactionStatus.FAILED, request.idempotencyKey)
-//                    // problem: we cannot ensure atomicity as we might have executed transfers with the partner
-//                    // at this point. We'd have to call the partner again to reverse the transfers already executed
-//                    // in this batch and then reverse the journal entries posted to ledger.
-//                    throw TransactionFailed("holdWithPolicy failed for ${request.idempotencyKey}")
-//                } catch (e: PartnerException) {
-//                    // this error can be retried; let's just ignore it
-//                    transactionsService.handleException(e, TransactionStatus.TRANSIENT_ERROR, request.idempotencyKey)
-//                }
-//            }
-//        }
-//    }
-
     suspend fun buyFunds() {
         val transactions =
             transactionsRepo.find(

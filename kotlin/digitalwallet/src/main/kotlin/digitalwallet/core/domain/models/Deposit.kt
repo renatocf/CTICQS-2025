@@ -20,7 +20,6 @@ class Deposit(
     completedAt: LocalDateTime? = null,
     failedAt: LocalDateTime? = null,
     status: digitalwallet.core.domain.enums.TransactionStatus,
-    metadata: TransactionMetadata? = null,
 ) : Transaction(
         id,
         batchId,
@@ -33,7 +32,6 @@ class Deposit(
         completedAt,
         failedAt,
         status,
-        metadata,
     ) {
     override fun validate(
         walletsRepo: WalletsDatabase,
