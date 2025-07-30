@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/digital-wallet.iml" filepath="$PROJECT_DIR$/.idea/modules/digital-wallet.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/digitalwallet.main.iml" filepath="$PROJECT_DIR$/.idea/modules/digitalwallet.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/digitalwallet.test.iml" filepath="$PROJECT_DIR$/.idea/modules/digitalwallet.test.iml" />
+    </modules>
+  </component>
+</project>
